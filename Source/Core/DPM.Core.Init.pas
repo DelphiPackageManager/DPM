@@ -90,7 +90,7 @@ uses
   DPM.Core.Upgrade.Github,
   DPM.Core.Upgrade.Cache,
 
-  // Signing — Phase 1
+  // Signing - Phase 1
   DPM.Core.Crypto.Hashing.Interfaces,
   DPM.Core.Crypto.Hashing,
   DPM.Core.Crypto.X509.Interfaces,
@@ -124,7 +124,7 @@ begin
 
   Container.RegisterType<IPackageSpecReader, TPackageSpecReader>;
 
-  //Prepare command services — used by `dpm prepare` and reusable from the IDE.
+  //Prepare command services - used by `dpm prepare` and reusable from the IDE.
   Container.RegisterType<IProjectTransformer, TProjectTransformer>;
   Container.RegisterType<IDpkTransformer, TDpkTransformer>;
   Container.RegisterType<IPreparePackageFolders, TPreparePackageFolders>;
@@ -187,7 +187,7 @@ begin
   // so the container resolves the ILogger-only one.
   Container.RegisterType<IUpgradeCheckCache, TUpgradeCheckCache>;
 
-  // Signing — Phase 1 registrations
+  // Signing - Phase 1 registrations
   Container.RegisterType<IHashingService, TBCryptHashingService>.AsSingleton;
   Container.RegisterType<IX509Service, TX509Service>;
   Container.RegisterType<ICmsService, TCmsService>;
@@ -201,14 +201,14 @@ begin
   // TYamlTrustStateService's ILogger-only ctor uses %APPDATA%\.dpm\trust-state.yaml;
   // the (logger, path) one is test-only.
   Container.RegisterType<ITrustStateService, TYamlTrustStateService>.AsSingleton;
-  // Non-interactive default — fails closed when no UI is wired. The CLI
+  // Non-interactive default - fails closed when no UI is wired. The CLI
   // and IDE register their own ITrustPromptStrategy on top of this default.
   Container.RegisterType<ITrustPromptStrategy, TNonInteractiveTrustPromptStrategy>;
 
   Container.RegisterInstance<TContainer>(Container);
 
   // Run overrideProc LAST so callers (e.g. the IDE plugin) can replace any of
-  // the core defaults above — Spring4D's default-registration semantics give
+  // the core defaults above - Spring4D's default-registration semantics give
   // last-write-wins for unnamed registrations of the same interface.
   if Assigned(overrideProc) then
     overrideProc(container);

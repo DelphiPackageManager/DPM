@@ -210,7 +210,7 @@ begin
     if ctx.cbEncoded > 0 then
       Move(ctx.pbEncoded^, tokenBytes[0], ctx.cbEncoded);
     signingTime := FileTimeToUtc(ctx.pTimeStamp.ftTime);
-    // For Phase 1 we don't surface the TSA certificate separately — Verify
+    // For Phase 1 we don't surface the TSA certificate separately - Verify
     // returns it. The returned token has the TSA cert embedded in its CMS.
     result := TTimestampToken.Create(tokenBytes, signingTime, nil);
   finally

@@ -54,7 +54,7 @@ type
     FHashing : IHashingService;
     FLogger : ILogger;
     /// <summary>
-    /// P3 §3.3 v2 — assemble a detached CMS SignedData when the provider
+    /// P3 §3.3 v2 - assemble a detached CMS SignedData when the provider
     /// can't expose a Win32 key handle. Computes the digest of the signed
     /// attributes locally, delegates the actual signature to provider.SignDigest
     /// (single remote call), then hand-encodes the SignerInfo + outer
@@ -72,7 +72,7 @@ type
     /// SignedData so the gallery server can complete leaf -> intermediate ->
     /// trusted root. Returns an empty array when no chain can be built (e.g.
     /// self-signed leaf, or the intermediate isn't installed on the signing
-    /// machine) — the signature then degrades to leaf-only. The returned
+    /// machine) - the signature then degrades to leaf-only. The returned
     /// ICertificates own duplicated CERT_CONTEXTs, so callers must keep the
     /// array alive for the duration of the sign call.
     /// </summary>
@@ -153,7 +153,7 @@ begin
     // OS doesn't know, in which case the hex code alone is still informative.
     msg := SysErrorMessage(code);
     if msg <> '' then
-      raise ECryptoCms.CreateFmt('%s failed: 0x%.8x — %s', [apiName, code, msg])
+      raise ECryptoCms.CreateFmt('%s failed: 0x%.8x - %s', [apiName, code, msg])
     else
       raise ECryptoCms.CreateFmt('%s failed: 0x%.8x', [apiName, code]);
   end;
@@ -215,7 +215,7 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// DER hand-encoding primitives — used by SignRemote to assemble the outer
+// DER hand-encoding primitives - used by SignRemote to assemble the outer
 // SignedData SEQUENCE / SET wrappers that Windows doesn't expose a struct
 // encoder for. Each helper takes already-encoded content and returns the
 // tag+length+content bytes.
@@ -272,7 +272,7 @@ begin
 end;
 
 function DerContext0Implicit(const content : TBytes) : TBytes;
-// [0] IMPLICIT (constructed) — context-specific tag with constructed bit.
+// [0] IMPLICIT (constructed) - context-specific tag with constructed bit.
 // Used for the certificates[0] in SignedData.
 begin
   result := DerWrapTag($A0, content);
@@ -365,7 +365,7 @@ var
   blob : CRYPT_INTEGER_BLOB;
   attr : CRYPT_ATTRIBUTE;
 begin
-  // Wrap the value in OCTET STRING — caller's convention for our signed
+  // Wrap the value in OCTET STRING - caller's convention for our signed
   // attribute payloads (e.g. dpmSignatureRole bytes).
   octet := EncodeOctetString(value);
   blob.cbData := Length(octet);
@@ -412,14 +412,14 @@ var
 begin
   FillChar(alg, SizeOf(alg), 0);
   alg.pszObjId := PAnsiChar(oid);
-  // Parameters field left empty — Windows omits the optional NULL for some
+  // Parameters field left empty - Windows omits the optional NULL for some
   // OIDs and writes ASN.1 NULL for others as appropriate.
   result := EncodeWith(X509_ALGORITHM_IDENTIFIER, @alg,
     'CryptEncodeObjectEx(X509_ALGORITHM_IDENTIFIER)');
 end;
 
 // CMS SignerInfo.HashEncryptionAlgorithm OID lookup. The CMS field name is
-// historical — it's the signature algorithm, not encryption. RSA reuses
+// historical - it's the signature algorithm, not encryption. RSA reuses
 // rsaEncryption regardless of digest; ECDSA uses the ecdsa-with-<hash>
 // OIDs from RFC 5758.
 function SignatureAlgOidFor(keyType : TCertKeyType; digest : THashAlgorithm) : AnsiString;
@@ -442,7 +442,7 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// DER parsing helpers — paired with the DER encoding helpers above. Only
+// DER parsing helpers - paired with the DER encoding helpers above. Only
 // what's needed to extract the [0] IMPLICIT signedAttrs from a SignerInfo
 // for the sign-time diagnostic that compares (a) the digest the client
 // sent to the remote signer against (b) the digest a verifier would
@@ -503,7 +503,7 @@ begin
   result := false;
   attrsOffset := 0;
   attrsTotalLen := 0;
-  // Local records aren't auto-initialised in Delphi — explicitly zero siSet
+  // Local records aren't auto-initialised in Delphi - explicitly zero siSet
   // so the post-loop tag check sees a sentinel (not stack garbage) on the
   // path where the signerInfos SET isn't found.
   FillChar(siSet, SizeOf(siSet), 0);
@@ -541,11 +541,11 @@ begin
     end;
     if (field.Tag = $A0) or (field.Tag = $A1) then
     begin
-      // certs[0] / crls[1] — skip
+      // certs[0] / crls[1] - skip
       fieldStart := field.ContentStart + field.ContentLength;
       Continue;
     end;
-    // Unexpected element — bail
+    // Unexpected element - bail
     exit;
   end;
   if siSet.Tag <> $31 then exit;
@@ -568,7 +568,7 @@ begin
   // Next is either [0] IMPLICIT signedAttrs (0xA0) or signatureAlgorithm
   if not ParseDerTLV(cmsDer, fieldStart, field) then exit;
   if field.Tag <> $A0 then
-    exit;  // No signedAttrs present — not our use case
+    exit;  // No signedAttrs present - not our use case
   attrsOffset := fieldStart;
   attrsTotalLen := field.TotalLength;
   result := true;
@@ -613,7 +613,7 @@ end;
 // how we expect. Used as a sign-time diagnostic to confirm Windows' encoder
 // preserved the ecdsa-with-shaXXX OID we asked for, instead of writing the
 // generic ECC OID 1.2.840.10045.2.1 (a known issue that breaks .NET
-// SignedCms.CheckSignature — see dotnet/runtime#91168).
+// SignedCms.CheckSignature - see dotnet/runtime#91168).
 function FindSignatureAlgorithmOid(const cmsDer : TBytes) : string;
 var
   attrsOffset, attrsTotalLen : integer;
@@ -651,7 +651,7 @@ begin
     exit;
   // Copy the [0] IMPLICIT bytes verbatim, then overwrite the leading tag
   // with the SET tag 0x31. Length and content are identical between the
-  // two forms (RFC 5652 §5.3, RFC 5652 §5.4 — signed attrs are hashed as
+  // two forms (RFC 5652 §5.3, RFC 5652 §5.4 - signed attrs are hashed as
   // a SET OF Attribute regardless of how they're tagged on the wire).
   SetLength(canonical, attrsTotalLen);
   Move(cmsDer[attrsOffset], canonical[0], attrsTotalLen);
@@ -683,7 +683,7 @@ var
   i, j : integer;
   tmp : TBytes;
 begin
-  // Insertion sort — N is tiny (3..5 attributes typically).
+  // Insertion sort - N is tiny (3..5 attributes typically).
   for i := 1 to High(items) do
   begin
     tmp := items[i];
@@ -710,11 +710,11 @@ begin
   chain := FX509.CreateChain;
   // Result ignored on purpose: even a partial / untrusted chain still yields
   // the intermediates we need, and the signing machine has them installed.
-  // Algorithm-agnostic — CertGetCertificateChain works for RSA and ECDSA alike.
+  // Algorithm-agnostic - CertGetCertificateChain works for RSA and ECDSA alike.
   chain.Build(cert, []);
   chainCerts := chain.ChainCertificates;   // leaf first, root last
   count := 0;
-  // Skip element 0 (the leaf — caller adds it). Skip any self-signed cert
+  // Skip element 0 (the leaf - caller adds it). Skip any self-signed cert
   // (the root, or a partial-chain self-signed terminal): subject = issuer.
   for i := 1 to High(chainCerts) do
   begin
@@ -749,7 +749,7 @@ var
   signerInfo : CMSG_SIGNER_INFO;
   signerInfoDer : TBytes;
   // Both OIDs are pulled into local AnsiStrings BEFORE being aliased into
-  // signerInfo via PAnsiChar(...) — otherwise the cast captures a pointer
+  // signerInfo via PAnsiChar(...) - otherwise the cast captures a pointer
   // into a function-return temporary that's freed at end-of-statement,
   // leaving signerInfo.*.pszObjId dangling when CryptEncodeObjectEx reads
   // it a few lines later. That corrupts the heap and crashes much later
@@ -826,7 +826,7 @@ begin
     encodedAttrs[i] := EncodeAttributeRaw(
       AnsiString(authAttrsArr[i].pszObjId),
       // value bytes: each rgValue[0] is a CRYPT_INTEGER_BLOB pointing at the
-      // already-DER value payload — wrap-once via PKCS_ATTRIBUTE encoder.
+      // already-DER value payload - wrap-once via PKCS_ATTRIBUTE encoder.
       // We re-encode here rather than reuse Windows' attribute encoding for
       // the array form because PKCS_ATTRIBUTE encodes one attr at a time.
       Copy(authAttrPayloads[i], 0, Length(authAttrPayloads[i])));
@@ -845,7 +845,7 @@ begin
   //    signer signs over.
   attrsHash := FHashing.HashBytes(signedAttrsSetDer, digest);
   FLogger.Verbose(Format('  SignRemote: SignedAttrs digest = %d bytes; calling provider.SignDigest', [Length(attrsHash)]));
-  // Diagnostic — full hex of the digest that's about to be sent over the
+  // Diagnostic - full hex of the digest that's about to be sent over the
   // wire. When post-sign verify fails, the user can correlate this against
   // (a) the digest the server logged for the same request, and (b) the
   // SHA-of-canonical-SignedAttrs reconstructed from the assembled CMS, to
@@ -854,7 +854,7 @@ begin
   // hex line, only at Verbose).
   FLogger.Verbose('  SignRemote: digest hex = ' + BytesToHex(attrsHash));
 
-  // 5. Single remote call — provider.SignDigest returns the raw signature
+  // 5. Single remote call - provider.SignDigest returns the raw signature
   //    value (RSA PKCS#1 v1.5 over the digest, or ECDSA equivalent).
   signatureBytes := provider.SignDigest(attrsHash, digest);
   if Length(signatureBytes) = 0 then
@@ -865,13 +865,13 @@ begin
   // 6. Build CMSG_SIGNER_INFO and let Windows encode the SignerInfo
   //    structure for us (PKCS7_SIGNER_INFO). The encoder takes the same
   //    CRYPT_ATTRIBUTE array we used for hashing and writes it out as
-  //    [0] IMPLICIT signedAttrs — bit-identical content, different tag.
+  //    [0] IMPLICIT signedAttrs - bit-identical content, different tag.
   certInfo := cert.GetContext.pCertInfo;
   FillChar(signerInfo, SizeOf(signerInfo), 0);
   signerInfo.dwVersion := 1;   // IssuerAndSerial form
   signerInfo.Issuer := certInfo.Issuer;
   signerInfo.SerialNumber := certInfo.SerialNumber;
-  // Stash both OIDs in locals first; see the comment near the var block —
+  // Stash both OIDs in locals first; see the comment near the var block -
   // PAnsiChar(<function-return AnsiString>) leaves a dangling pointer.
   hashAlgOid := TAlgorithmProfile.HashOid(digest);
   signerInfo.HashAlgorithm.pszObjId := PAnsiChar(hashAlgOid);
@@ -903,7 +903,7 @@ begin
   digestAlgsSetDer := DerSet(digestAlgDer);
 
   sigAlgDer := EncodeAlgorithmIdentifier(szOID_RSA_RSA);   // not embedded directly; computed for symmetry / future use
-  // sigAlgDer is currently unused at the SignedData level — the algorithm
+  // sigAlgDer is currently unused at the SignedData level - the algorithm
   // identifier travels with the SignerInfo. Suppress "unused" via reference:
   if Length(sigAlgDer) = 0 then ; // intentionally noop
 
@@ -911,7 +911,7 @@ begin
   // (no [0] EXPLICIT eContent OCTET STRING).
   encapContentInfoDer := DerSequence(EncodeOidValue(szOID_RSA_data));
 
-  // certificates [0] IMPLICIT CertificateSet — leaf followed by every
+  // certificates [0] IMPLICIT CertificateSet - leaf followed by every
   // intermediate so the gallery server can complete the chain to a trusted
   // root. Each Certificate DER is already a SEQUENCE, so concatenating the raw
   // cert DERs is the correct CertificateSet content (no extra SET wrapper).
@@ -943,11 +943,11 @@ begin
   result := EncodeWith(PKCS_CONTENT_INFO, @contentInfo,
     'CryptEncodeObjectEx(PKCS_CONTENT_INFO)');
 
-  // Diagnostic — recover the canonical SignedAttrs hash a verifier would
+  // Diagnostic - recover the canonical SignedAttrs hash a verifier would
   // recompute from the assembled CMS, and compare against the digest we
   // actually sent to the remote signer. We've seen post-sign verify failures
   // where the messageDigest attribute is correct and the remote signer's
-  // own verify passes, but the CMS still fails to verify locally — this
+  // own verify passes, but the CMS still fails to verify locally - this
   // check distinguishes the two possible causes:
   //   - hashes match → our encoded SignedAttrs match what Windows embedded,
   //                    so the signature bytes themselves are wrong / corrupt
@@ -964,7 +964,7 @@ begin
   else
   begin
     FLogger.Warning(TWarningCode.W7009_SignatureSelfCheckFailed,
-      'SignRemote: ENCODING DIVERGENCE — the SignedAttrs hash a verifier ' +
+      'SignRemote: ENCODING DIVERGENCE - the SignedAttrs hash a verifier ' +
       'will recompute from the assembled CMS does NOT match the digest we ' +
       'sent to the remote signer. The remote signer signed our digest ' +
       'correctly, but the bytes Windows embedded in the CMS hash to a ' +
@@ -976,12 +976,12 @@ begin
   // Second self-check: confirm the signature value Windows' PKCS7_SIGNER_INFO
   // encoder put into the CMS's encryptedDigest is byte-identical to what the
   // remote signer returned. If they differ, the encoder corrupted the
-  // signature on the way in — distinct from the encoding-divergence case
+  // signature on the way in - distinct from the encoding-divergence case
   // above. The two checks together fully cover the "received signature →
   // embedded CMS" hop: if both pass and verify still fails, the bug is
   // beyond DPM's control (the signature genuinely doesn't match the digest
   // under this key per Windows' verifier, even though server-side ECDsa
-  // verify accepted it — typically signatureAlgorithm OID mismatches or
+  // verify accepted it - typically signatureAlgorithm OID mismatches or
   // CryptoAPI ECDSA strictness peculiarities, see ExtractEncryptedDigest
   // diagnostic in SignPackage).
   embeddedSig := ExtractEncryptedDigest(result);
@@ -992,7 +992,7 @@ begin
   else
   begin
     FLogger.Warning(TWarningCode.W7009_SignatureSelfCheckFailed,
-      'SignRemote: SIGNATURE CORRUPTION — Windows'' PKCS7_SIGNER_INFO ' +
+      'SignRemote: SIGNATURE CORRUPTION - Windows'' PKCS7_SIGNER_INFO ' +
       'encoder embedded a different signature value than the one returned ' +
       'by the remote signer.' + sLineBreak +
       '  received sig = ' + BytesToHex(signatureBytes) + sLineBreak +
@@ -1036,7 +1036,7 @@ begin
     raise ECryptoCms.Create('Sign: provider is nil');
   if provider.Certificate = nil then
     raise ECryptoCms.Create('Sign: provider has no certificate');
-  // P3 §3.3 v2 — remote providers don't expose a Win32 key handle, so
+  // P3 §3.3 v2 - remote providers don't expose a Win32 key handle, so
   // CryptSignMessage can't sign on their behalf. Branch into the manual
   // CMS-assembly path that does the single remote SignDigest call.
   if not provider.IsLocal then
@@ -1065,7 +1065,7 @@ begin
 
   // Embed the leaf followed by every intermediate so the gallery server can
   // complete the chain to a trusted root. `intermediates` must stay in scope
-  // until after CryptSignMessage — its ICertificates own the duplicated
+  // until after CryptSignMessage - its ICertificates own the duplicated
   // CERT_CONTEXTs referenced by msgCerts.
   intermediates := CollectIntermediateCerts(provider.Certificate);
   SetLength(msgCerts, 1 + Length(intermediates));
@@ -1081,7 +1081,7 @@ begin
   para.pSigningCert := msgCerts[0];
   // Pin the OID string in a local AnsiString so PAnsiChar(...) doesn't
   // capture a function-return temporary that gets freed before
-  // CryptSignMessage reads it (heap-corruption trap — see SignRemote).
+  // CryptSignMessage reads it (heap-corruption trap - see SignRemote).
   hashAlgOid := TAlgorithmProfile.HashOid(digest);
   para.HashAlgorithm.pszObjId := PAnsiChar(hashAlgOid);
   para.cMsgCert := Length(msgCerts);
@@ -1149,7 +1149,7 @@ begin
       'der=%d bytes, content=%d bytes, GetLastError=0x%.8x',
       [Length(der), Length(content), GetLastError]));
 
-  // ctx is the certificate Windows actually verified the signature against —
+  // ctx is the certificate Windows actually verified the signature against -
   // the signer leaf, identified by the SignerInfo's IssuerAndSerialNumber.
   // We MUST use it directly: author signatures now embed leaf + intermediate
   // CA cert(s), so EmbeddedCertificates[0] is NOT guaranteed to be the leaf
@@ -1178,7 +1178,7 @@ var
   size : DWORD;
 begin
   // Minimal decode: open the message, feed the bytes, fetch CMSG_ENCRYPTED_
-  // DIGEST, close. No pointer-chasing into signer-info / attribute arrays —
+  // DIGEST, close. No pointer-chasing into signer-info / attribute arrays -
   // avoids AVs on hand-assembled CMS that Windows can still parse far
   // enough to expose the signature value but trips up on deeper traversal.
   SetLength(result, 0);
@@ -1226,7 +1226,7 @@ begin
       'CryptMsgUpdate');
 
     // The attribute value for an RFC3161 counter-signature is the raw DER
-    // TimeStampToken (a ContentInfo) — NOT wrapped in OCTET STRING. The
+    // TimeStampToken (a ContentInfo) - NOT wrapped in OCTET STRING. The
     // attribute value bytes are used as-is.
     attrValue.cbData := Length(value);
     if attrValue.cbData > 0 then
@@ -1238,7 +1238,7 @@ begin
     attr.rgValue := @attrValue;
 
     // CryptMsgControl(ADD_SIGNER_UNAUTH_ATTR) takes a struct whose `blob`
-    // is the *DER-encoded* CRYPT_ATTRIBUTE — not the raw struct in memory.
+    // is the *DER-encoded* CRYPT_ATTRIBUTE - not the raw struct in memory.
     // Hand the attribute to CryptEncodeObjectEx(PKCS_ATTRIBUTE) first, then
     // pass the resulting bytes to CryptMsgControl.
     encodedAttr := nil;
@@ -1324,7 +1324,7 @@ var
 begin
   result := nil;
 
-  // Select the signer by its IssuerAndSerialNumber — NEVER just take cert[0].
+  // Select the signer by its IssuerAndSerialNumber - NEVER just take cert[0].
   // Author signatures now embed the leaf followed by intermediate CA cert(s)
   // so the gallery can complete the chain. The CMSG_CERT_PARAM enumeration
   // order is unspecified and Windows frequently returns the intermediate at
@@ -1426,7 +1426,7 @@ begin
   begin
     attrs[i].Oid := AnsiString(attr.pszObjId);
     // CRYPT_ATTRIBUTE.rgValue points at a contiguous array of cValue
-    // CRYPT_ATTR_BLOB structures. Walk the whole array — most DPM
+    // CRYPT_ATTR_BLOB structures. Walk the whole array - most DPM
     // attributes are single-valued, but dpmVerifiedAuthorSigHash carries
     // one hash value per attested author signature.
     SetLength(attrs[i].Values, attr.cValue);

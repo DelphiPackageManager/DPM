@@ -39,11 +39,11 @@ type
   TCmsAttribute = record
     Oid    : AnsiString;
     // CMS attributes are `Attribute SEQUENCE { OID, SET OF AttributeValue }`
-    // — i.e. the value field is intrinsically a SET that may carry one or
+    // - i.e. the value field is intrinsically a SET that may carry one or
     // many values. Most DPM attributes are single-valued, so Value is kept
     // as a convenience pointing at Values[0]. Multi-valued attributes
     // (e.g. dpmVerifiedAuthorSigHash carrying one hash per attested author
-    // signature) need to walk Values themselves — use FindSignedAttributeValues
+    // signature) need to walk Values themselves - use FindSignedAttributeValues
     // for that.
     Value  : TBytes;             // shortcut: Values[0] if any, else nil
     Values : TArray<TBytes>;     // every AttributeValue under this OID
@@ -60,7 +60,7 @@ type
     function FindUnsignedAttribute(const oid : AnsiString; out value : TBytes) : boolean;
     /// <summary>
     /// Returns every AttributeValue carried by the named signed attribute.
-    /// CMS attributes are SET OF AttributeValue — most DPM attributes have a
+    /// CMS attributes are SET OF AttributeValue - most DPM attributes have a
     /// single value (use FindSignedAttribute then), but the author<->repo
     /// binding (dpmVerifiedAuthorSigHash) carries one hash per attested
     /// author signature, so the verifier walks the whole set.
@@ -75,7 +75,7 @@ type
     /// </summary>
     function SignatureAlgorithmOid : string;
     // Per RFC3161 + szOID_RFC3161_counterSign convention, the timestamp
-    // covers the signer info's `encryptedDigest` (signature value) — not
+    // covers the signer info's `encryptedDigest` (signature value) - not
     // the whole CMS. Adding/removing unsigned attributes does NOT change
     // this field, so sign-time and verify-time hashes match.
     function EncryptedDigest : TBytes;

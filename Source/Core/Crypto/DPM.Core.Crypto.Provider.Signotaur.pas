@@ -26,7 +26,7 @@
 
 unit DPM.Core.Crypto.Provider.Signotaur;
 
-// Phase 3 §3.3 v2 — Signotaur signing provider.
+// Phase 3 §3.3 v2 - Signotaur signing provider.
 //
 // Signotaur (https://www.finalbuilder.com/signotaur) is VSoft's code-signing
 // server application.
@@ -36,12 +36,12 @@ unit DPM.Core.Crypto.Provider.Signotaur;
 //   POST {endpoint}/api/v1/cert/get   (GetCertRequest  -> GetCertResponse)
 //   POST {endpoint}/api/v1/sign       (SignRequest     -> SignResponse)
 //
-// JSON field names are camelCase — the Signotaur server's REST surface
+// JSON field names are camelCase - the Signotaur server's REST surface
 // canonicalises camelCase regardless of the gRPC proto's PascalCase, because
 // the underlying .NET JsonNamingPolicy.CamelCase serializer rewrites
 // PascalCase property names on emit. JsonDataObjects lookups are
 // case-sensitive so the names below MUST match the wire format exactly.
-// Bytes fields are base64-encoded (standard, NOT base64url — different from
+// Bytes fields are base64-encoded (standard, NOT base64url - different from
 // Azure KV).
 //
 // Authentication: the API key is sent in the Authorization request header, not
@@ -70,13 +70,13 @@ type
     // are set, server preference is Thumbprint > Label > Subject.
     Thumbprint   : string;
     Subject      : string;
-    Label_       : string;     // underscore — `Label` is a Delphi reserved word in some contexts
+    Label_       : string;     // underscore - `Label` is a Delphi reserved word in some contexts
     // Optional metadata the server logs / audits alongside the sign call.
     FileName     : string;
     FileSizeBytes : Int64;
     FileVersion  : string;
     // Trust TLS chains that fail validation (self-signed, untrusted CA,
-    // hostname mismatch). For dev / on-prem Signotaur deployments only —
+    // hostname mismatch). For dev / on-prem Signotaur deployments only -
     // production endpoints should always present a chained-to-trusted-CA cert.
     AllowSelfSignedCertificates : boolean;
   end;
@@ -240,7 +240,7 @@ begin
   if Length(response.Response) > 0 then
     FLogger.Verbose('Signotaur response body: ' + response.Response);
   // A 405 (Method Not Allowed) on the REST endpoint means the server does not
-  // expose the /api/v1 REST surface at all — that is Signotaur v1, which only
+  // expose the /api/v1 REST surface at all - that is Signotaur v1, which only
   // speaks gRPC. DPM signs over REST, so the user needs to upgrade.
   if response.StatusCode = 405 then
     raise EProviderFatal.Create(
@@ -249,7 +249,7 @@ begin
       'Signotaur v2 or later is required to sign with DPM.');
   if response.StatusCode <> 200 then
     // HTTP-level failure: bad endpoint, bad API key, server down. None of
-    // these get better by trying the next file — raise as fatal so the
+    // these get better by trying the next file - raise as fatal so the
     // batch loop aborts instead of generating N more guaranteed failures.
     raise EProviderFatal.CreateFmt(
       'Signotaur cert lookup failed (HTTP %d): %s',
@@ -389,7 +389,7 @@ begin
 
   cancellationToken := TCancellationTokenSourceFactory.Create.Token;
   httpClient := THttpClientFactory.CreateClient(FOptions.Endpoint);
-  // Self-signed flag must be reapplied per client instance — the cert/get
+  // Self-signed flag must be reapplied per client instance - the cert/get
   // call already warned the user; no need to warn again on every sign.
   if FOptions.AllowSelfSignedCertificates then
     httpClient.AllowSelfSignedCertificates := true;
@@ -413,7 +413,7 @@ begin
         'Signotaur sign HTTP call failed (%s): %s',
         [e.ClassName, e.Message]);
   end;
-  // Log status separately from body — body logging on a huge / binary
+  // Log status separately from body - body logging on a huge / binary
   // response has crashed the console writer in the past, and we always
   // want to know the status came back even if the body log fails.
   FLogger.Debug(Format('Signotaur HTTP %d response (%d bytes)',

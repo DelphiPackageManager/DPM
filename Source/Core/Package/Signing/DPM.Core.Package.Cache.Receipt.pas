@@ -26,7 +26,7 @@
 
 unit DPM.Core.Package.Cache.Receipt;
 
-// dpm-verification-receipt.yaml — written last on a successful verify-and-
+// dpm-verification-receipt.yaml - written last on a successful verify-and-
 // extract (V-31). Records the manifest hash, signer SPKIs, effective signing
 // time, trust decision, and a fingerprint of the policy that produced the
 // decision so a policy change forces a re-verify (V-32, V-33).
@@ -54,7 +54,7 @@ type
     EffectiveSigningTime : TDateTime;
     TimestampAuthority  : string;
     RevocationStatus    : string;       // 'notChecked' | 'good' | 'revoked' | 'unknown'
-    // P2 §2.2 — only populated for repository signatures from trusted repos.
+    // P2 §2.2 - only populated for repository signatures from trusted repos.
     // AttestationNamespace empty = no attestation read.
     AttestationNamespace : string;
     AttestationAuthorSpkiHex : string;
@@ -172,7 +172,7 @@ begin
         sb.Append('  effectiveSigningTime: '); sb.AppendLine(TStringUtils.YamlSingleQuote(IsoUtc(sig.EffectiveSigningTime)));
         sb.Append('  timestampAuthority: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.TimestampAuthority));
         sb.Append('  revocationStatus: '); sb.AppendLine(TStringUtils.YamlSingleQuote(sig.RevocationStatus));
-        // P2 §2.2 — attestation block is omitted entirely when not present
+        // P2 §2.2 - attestation block is omitted entirely when not present
         // (i.e. for author signatures or untrusted-repo signatures).
         if sig.AttestationNamespace <> '' then
           begin
@@ -221,7 +221,7 @@ var
 begin
   result := false;
   FillChar(receipt, SizeOf(receipt), 0);
-  // Strings inside the record are managed types — re-initialise to empty.
+  // Strings inside the record are managed types - re-initialise to empty.
   receipt.PackageId := '';
   receipt.Version := '';
   receipt.Compiler := '';

@@ -283,7 +283,7 @@ begin
       end;
 
       // Validate the *original* name so M-8's backslash check fires here.
-      // Strip a trailing slash before validation (directory marker — the
+      // Strip a trailing slash before validation (directory marker - the
       // path-safety rule treats trailing slashes on otherwise valid names
       // as a no-op).
       candidatePath := name;
@@ -304,7 +304,7 @@ begin
       end;
 
       // V-9: case-insensitive duplicate check on NFC name (full original name
-      // including any trailing slash — Windows / NTFS treat the two
+      // including any trailing slash - Windows / NTFS treat the two
       // representations as the same file).
       lowered := LowerCase(normalised);
       if seen.ContainsKey(lowered) then

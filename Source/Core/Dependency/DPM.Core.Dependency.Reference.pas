@@ -54,7 +54,7 @@ type
     FSelectedOn : TVersionRange;
     FUseSource : boolean;
     FCompilerVersion : TCompilerVersion;
-    FManifestHash : string;   // P2 §2.6 — lock-file content hash, "sha256:<hex>"
+    FManifestHash : string;   // P2 §2.6 - lock-file content hash, "sha256:<hex>"
 
     FPackageInfo : IPackageInfo;
 

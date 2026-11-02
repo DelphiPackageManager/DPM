@@ -13,7 +13,7 @@
 #     verification cache.
 #   - It SHIPS an emergency revocation channel that overrides any per-user
 #     `trustedRepositories` pin.
-#   - It does NOT define trusted *publishers* — those are per-user, set via
+#   - It does NOT define trusted *publishers* - those are per-user, set via
 #     `dpm trust add publisher ...` and live in the user's dpm.config.yaml.
 #
 # When to bump dpmTrustSetVersion:
@@ -48,7 +48,7 @@ repositorySpki:
     spki: "sha256:c2d7996a815b4d2061789f367b2fcfbb08afcc4c31af47c4efce91a4413a39f8"
 
 # Emergency revocation channel. A repository SPKI here is treated as
-# untrusted REGARDLESS of any other configuration — including the user's
+# untrusted REGARDLESS of any other configuration - including the user's
 # own trustedRepositories pin and the repositorySpki list above. Use this
 # when a key is compromised and must be cut off across every install of
 # this DPM version. Quoting the strings is recommended but optional;

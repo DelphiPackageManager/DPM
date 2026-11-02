@@ -68,7 +68,7 @@ type
   ISigningConfig = interface(IConfigNode)
     ['{7E4C9A66-9C7C-46C8-B98D-2BCBD4471B91}']
     // 'permissive' | 'require' | 'repository-required' | 'author-and-repository'
-    // The mode is the single switch — `permissive` already accepts unsigned
+    // The mode is the single switch - `permissive` already accepts unsigned
     // packages; the three stricter modes reject them.
     function GetValidationMode : string;
     procedure SetValidationMode(const value : string);

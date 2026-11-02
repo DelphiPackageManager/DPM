@@ -27,7 +27,7 @@
 unit DPM.Core.Trust.State;
 
 // Per-user sticky trust state ratchet (TOFU). Records, per package id, the
-// highest assurance ever observed for the author dimension (Phase 1) — the
+// highest assurance ever observed for the author dimension (Phase 1) - the
 // repository dimension is added in Phase 2.
 //
 // File: %APPDATA%\.dpm\trust-state.yaml. The CLI, the IDE and parallel builds share it, so every
@@ -329,7 +329,7 @@ begin
     end;
     FEntries[key] := entry;
 
-    // Phase 2 — pick up the repository ratchet fields if present.
+    // Phase 2 - pick up the repository ratchet fields if present.
     repoEntry.TrustedRepoSpkiHex := '';
     repoEntry.Namespace := '';
     repoEntry.FirstSeenAt := 0;
@@ -409,7 +409,7 @@ begin
   if (dir <> '') and not DirectoryExists(dir) then
     ForceDirectories(dir);
 
-  // Union of both keyspaces — a package id may have only repo state
+  // Union of both keyspaces - a package id may have only repo state
   // (never seen an author signature) or only author state (no trusted
   // repo has yet signed it).
   allKeys := TCollections.CreateDictionary<string, byte>(TIStringComparer.Ordinal);

@@ -210,7 +210,7 @@ begin
   FId               := jsonObject.S['id'];
   FVersion          := TPackageVersion.Parse(jsonObject.S['version']);
 
-  //server JSON sends authors as a CSV string — split so the interface exposes the same list shape as the spec.
+  //server JSON sends authors as a CSV string - split so the interface exposes the same list shape as the spec.
   SplitCsvIntoList(jsonObject.S['authors'], FAuthors);
 
   FReleaseNotes     := jsonObject.S['releaseNotes'];
@@ -524,7 +524,7 @@ end;
 
 function TDPMPackageSearchResultItem.GetHash : string;
 begin
-  //search results don't carry a separate IPackageInfo.Hash — reuse the file hash.
+  //search results don't carry a separate IPackageInfo.Hash - reuse the file hash.
   result := FFileHash;
 end;
 

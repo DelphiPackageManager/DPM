@@ -1,6 +1,6 @@
 unit DPM.Core.Tests.Utils.DateTime;
 
-// Tests for TDPMDateTimeUtils — the System.DateUtils ISO 8601 polyfill that
+// Tests for TDPMDateTimeUtils - the System.DateUtils ISO 8601 polyfill that
 // keeps the codebase building on XE2..XE6. The tests must pass on every
 // supported compiler, so the assertions focus on the *contract* (round-trip,
 // known values, malformed-input handling) and avoid leaning on either side
@@ -108,7 +108,7 @@ var
   original, recovered : TDateTime;
   s : string;
 begin
-  // Same idea but without the UTC normalisation step — the local-time path
+  // Same idea but without the UTC normalisation step - the local-time path
   // must also round-trip without drift.
   original := EncodeDateTime(2026, 7, 4, 12, 0, 0, 0);
   s := TDPMDateTimeUtils.DateToISO8601(original, False);

@@ -37,7 +37,7 @@ type
   ///<summary>Options driving a restore. Unlike TInstallOptions, both callers use the same shape:
   ///  CLI: ProjectPath = directory or single .dproj (defaulting to cwd); CompilerVersion / Sources / Prerelease.
   ///  IDE: ProjectPath = the .dproj filename from the current IDE project; CompilerVersion from the IDE bitness.
-  ///  There's no IDE-specific Projects array — the IDE restores one project at a time.
+  ///  There's no IDE-specific Projects array - the IDE restores one project at a time.
   ///</summary>
   TRestoreOptions = class(TSearchOptions)
   private

@@ -53,7 +53,7 @@ type
     function RevokedRepositorySpkis : TArray<string>;
   public
     /// <summary>
-    /// Default constructor — loads from the DPM_TRUST_SET YAML resource
+    /// Default constructor - loads from the DPM_TRUST_SET YAML resource
     /// compiled into the host binary. Missing resource yields safe defaults.
     /// </summary>
     constructor Create; overload;
@@ -74,7 +74,7 @@ uses
 // embeds the latest dpm-trust-set.yaml content. The .rc lives alongside
 // dpm.rc in the Source/ directory so both the CLI and every IDE plugin
 // share one source. Delphi resolves $R first in the source file's
-// directory, then in the project (.dpr) directory — which is Source/ for
+// directory, then in the project (.dpr) directory - which is Source/ for
 // every consumer here, so a bare filename works without path tricks.
 {$R '..\..\DPM.TrustSet.res'}
 
@@ -184,11 +184,11 @@ begin
     end;
   end;
 
-  // P3 §3.4 — emergency revocation channel. Plain sequence of SPKI strings.
+  // P3 §3.4 - emergency revocation channel. Plain sequence of SPKI strings.
   // YAML quirk: an unquoted scalar like `sha256:abcd1234` parses as a 1-key
   // mapping (`{sha256: abcd1234}`) in strict YAML because of the embedded
   // colon. We tolerate both shapes here so users don't have to remember to
-  // quote — the unquoted mapping form is reassembled into `key:value`.
+  // quote - the unquoted mapping form is reassembled into `key:value`.
   repoSeq := root.AsMapping.Values['revokedRepositorySpki'];
   if (repoSeq <> nil) and repoSeq.IsSequence then
   begin
@@ -204,7 +204,7 @@ begin
       else if item.IsMapping and (item.AsMapping.Count = 1) then
       begin
         // Reassemble {key: value} back into `key:value`. Value side may be
-        // an integer if it parses as one — defensively coerce. (For real
+        // an integer if it parses as one - defensively coerce. (For real
         // hex SPKIs the value always has at least one a-f char so it
         // shouldn't, but we don't want a 0..9-only SPKI to vanish.)
         FRevokedRepositorySpkis[i] := item.AsMapping.GetKey(0) + ':';

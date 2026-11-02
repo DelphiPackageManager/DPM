@@ -838,7 +838,7 @@ function TProjectEditor.LoadPackageRefences : boolean;
           newNode  := parentReference.AddChild(id, version, range)
         else
           newNode := FPackageRefences.AddChild(id, version, TVersionRange.Empty);
-        // P2 §2.6 — optional manifest-hash lock attribute. Tolerated when
+        // P2 §2.6 - optional manifest-hash lock attribute. Tolerated when
         // absent; older projects without a lock just won't get a lock check.
         if packageElement.getAttributeNode('manifestHash') <> nil then
           newNode.ManifestHash := packageElement.getAttribute('manifestHash');
@@ -1172,7 +1172,7 @@ var
     if not packageReference.VersionRange.IsEmpty then
       packageRefElement.setAttribute('range', packageReference.VersionRange.ToString);
     //'use source' is an IDE-session-only debugging choice - never persisted to the dproj.
-    // P2 §2.6 — write the lock hash if the installer recorded one. Older
+    // P2 §2.6 - write the lock hash if the installer recorded one. Older
     // installs may have no hash yet; that's tolerated until next upgrade.
     if packageReference.ManifestHash <> '' then
       packageRefElement.setAttribute('manifestHash', packageReference.ManifestHash);

@@ -26,7 +26,7 @@
 
 unit DPM.Core.Crypto.Provider;
 
-// Phase 1 signing providers — local certificate store and PFX file. Smart
+// Phase 1 signing providers - local certificate store and PFX file. Smart
 // cards and HSMs work transparently through the certificate-store provider,
 // because CryptAcquireCertificatePrivateKey resolves the CNG KSP for us.
 //
@@ -48,7 +48,7 @@ type
     FCertificate : ICertificate;
     // Session keep-alive. When BeginSession is called, the private key is
     // acquired and held until EndSession. For smart cards / HSMs (YubiKey,
-    // PIV minidrivers) this keeps the card session — and the cached PIN —
+    // PIV minidrivers) this keeps the card session - and the cached PIN -
     // alive across the multiple CryptSignMessage calls a multi-file sign
     // makes, so the user is only prompted once per `dpm sign` invocation.
     FSessionHandle      : HCRYPTPROV_OR_NCRYPT_KEY_HANDLE;
@@ -71,7 +71,7 @@ type
   end;
 
   TPfxSigningProvider = class(TCertStoreSigningProvider)
-  // PFX is functionally identical at the provider level — once
+  // PFX is functionally identical at the provider level - once
   // PFXImportCertStore has set the leaf's key spec, CryptAcquireCertificate-
   // PrivateKey resolves it the same way. This subclass exists purely so DI
   // registration / CLI plumbing can distinguish the two.
@@ -136,7 +136,7 @@ end;
 function TCertStoreSigningProvider.SignDigest(const digest : TBytes;
                                                digestAlgorithm : THashAlgorithm) : TBytes;
 begin
-  // Local providers don't need this — the CMS layer goes through the
+  // Local providers don't need this - the CMS layer goes through the
   // AcquirePrivateKey + CryptSignMessage path. Surface as a clear error in
   // case a future code path accidentally calls it.
   raise ENotImplementedSignDigest.Create(
@@ -153,7 +153,7 @@ begin
   callerMustFree := false;
 
   // If a session is active, hand back the pre-acquired handle and tell the
-  // caller NOT to release it — the session owns it.
+  // caller NOT to release it - the session owns it.
   if FSessionActive then
   begin
     keyHandle := FSessionHandle;

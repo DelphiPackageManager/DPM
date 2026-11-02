@@ -1,6 +1,6 @@
 ﻿unit DPM.Core.Tests.Trust.TrustSet;
 
-// TBuiltInTrustSet — verify the YAML loader's defaults and field handling.
+// TBuiltInTrustSet - verify the YAML loader's defaults and field handling.
 // The default constructor reads from an RC resource; this test exe has no
 // such resource, so we cover both the safe-defaults path and the explicit-
 // YAML constructor.
@@ -32,7 +32,7 @@ type
     [Test] procedure MalformedYaml_Tolerated_FallsBackToDefaults;
     [Test] procedure NonMappingRoot_Tolerated;
 
-    // P3 §3.4 — revoked-repository channel
+    // P3 §3.4 - revoked-repository channel
     [Test] procedure RevokedRepositorySpkis_Default_IsEmpty;
     [Test] procedure RevokedRepositorySpkis_LoadedFromYaml;
     [Test] procedure RevokedRepositorySpkis_Tolerates_MissingSequence;
@@ -52,7 +52,7 @@ var
 begin
   // Linked-in resource from DPM.TrustSet.rc / dpm-trust-set.yaml. Locked
   // to the shipped values so a change to the YAML that isn't matched here
-  // is caught — this is the canonical source of trust for every binary.
+  // is caught - this is the canonical source of trust for every binary.
   ts := TBuiltInTrustSet.Create;
   Assert.AreEqual(1, ts.Version, 'shipped trust-set version');
   Assert.AreEqual(Ord(vmPermissive), Ord(ts.DefaultValidationMode));
@@ -167,7 +167,7 @@ var
   ts : ITrustSet;
 begin
   ts := TBuiltInTrustSet.Create(cBad);
-  // Should silently fall back to defaults — no exception escapes.
+  // Should silently fall back to defaults - no exception escapes.
   Assert.AreEqual(0, ts.Version);
   Assert.AreEqual(Ord(vmPermissive), Ord(ts.DefaultValidationMode));
   Assert.AreEqual<integer>(0, Length(ts.RepositorySpkis));
@@ -175,7 +175,7 @@ end;
 
 procedure TBuiltInTrustSetTests.NonMappingRoot_Tolerated;
 const
-  // Top-level sequence — not a valid trust-set shape, but must not crash.
+  // Top-level sequence - not a valid trust-set shape, but must not crash.
   cYaml = '- 1'#10 + '- 2'#10;
 var
   ts : ITrustSet;
@@ -221,7 +221,7 @@ const
 var
   ts : ITrustSet;
 begin
-  // No revokedRepositorySpki key at all — must yield an empty array, not raise.
+  // No revokedRepositorySpki key at all - must yield an empty array, not raise.
   ts := TBuiltInTrustSet.Create(cYaml);
   Assert.AreEqual<integer>(0, Length(ts.RevokedRepositorySpkis));
 end;

@@ -28,7 +28,7 @@ unit DPM.Core.Crypto.Win32;
 
 // Flat Win32 imports for the cryptography layer: crypt32.dll, bcrypt.dll,
 // ncrypt.dll, wintrust.dll. This is the single API surface for the whole
-// crypto layer — no other DPM unit imports these DLLs directly.
+// crypto layer - no other DPM unit imports these DLLs directly.
 //
 // Conventions:
 //   * Structures use Windows naming (e.g. CERT_CONTEXT) to keep MSDN searches
@@ -49,7 +49,7 @@ const
   cNCrypt  = 'ncrypt.dll';
 
 // ---------------------------------------------------------------------------
-// BCrypt (CNG) — used by DPM.Core.Crypto.Hashing
+// BCrypt (CNG) - used by DPM.Core.Crypto.Hashing
 // ---------------------------------------------------------------------------
 
 type
@@ -105,7 +105,7 @@ function BCryptDestroyHash(hHash : BCRYPT_HASH_HANDLE) : NTSTATUS; stdcall;
 
 
 // ---------------------------------------------------------------------------
-// Crypt32 — certificates, certificate stores, chains, CMS
+// Crypt32 - certificates, certificate stores, chains, CMS
 // ---------------------------------------------------------------------------
 
 type
@@ -203,7 +203,7 @@ type
     cbSize             : DWORD;
     RequestedUsage     : CERT_USAGE_MATCH;
     // Two further (optional) fields exist on later SDKs (RequestedIssuancePolicy,
-    // dwUrlRetrievalTimeout, fCheckRevocationFreshnessTime, etc.) — we use the
+    // dwUrlRetrievalTimeout, fCheckRevocationFreshnessTime, etc.) - we use the
     // shorter form that's available since XP.
   end;
   PCERT_CHAIN_PARA = ^CERT_CHAIN_PARA;
@@ -229,11 +229,11 @@ type
     dwInfoStatus  : DWORD;
   end;
 
-  // Stub for PCCRL_CONTEXT — we don't dereference it; we just need a typed
+  // Stub for PCCRL_CONTEXT - we don't dereference it; we just need a typed
   // pointer to match the SDK layout.
   PCCRL_CONTEXT = Pointer;
 
-  // CRL_ENTRY (RFC 5280 §5.1) — describes one revoked certificate. RevocationDate
+  // CRL_ENTRY (RFC 5280 §5.1) - describes one revoked certificate. RevocationDate
   // tells us when it was revoked; rgExtension may carry the reason code under
   // OID 2.5.29.21 (id-ce-cRLReasons).
   PCRL_ENTRY = ^CRL_ENTRY;
@@ -309,7 +309,7 @@ const
   X509_ASN_ENCODING   = $00000001;
   PKCS_7_ASN_ENCODING = $00010000;
 
-  // Cert store provider IDs — CertOpenStore takes lpszStoreProvider as
+  // Cert store provider IDs - CertOpenStore takes lpszStoreProvider as
   // either a string pointer or a small integer cast to PAnsiChar.
   CERT_STORE_PROV_MSG        = PAnsiChar(1);
   CERT_STORE_PROV_MEMORY     = PAnsiChar(2);
@@ -349,7 +349,7 @@ const
   szOID_PKIX_KP_CODE_SIGNING : AnsiString = '1.3.6.1.5.5.7.3.3';
   szOID_PKIX_KP_TIMESTAMP_SIGNING : AnsiString = '1.3.6.1.5.5.7.3.8';
   szOID_RSA_RSA              : AnsiString = '1.2.840.113549.1.1.1';
-  // id-ecPublicKey — the SubjectPublicKeyInfo algorithm OID for any ECDSA
+  // id-ecPublicKey - the SubjectPublicKeyInfo algorithm OID for any ECDSA
   // certificate. The actual curve is identified by the algorithm's parameters
   // field, which (for named curves) is itself an OBJECT IDENTIFIER.
   szOID_ECC_PUBLIC_KEY       : AnsiString = '1.2.840.10045.2.1';
@@ -363,7 +363,7 @@ const
   szOID_RSA_SHA512RSA        : AnsiString = '1.2.840.113549.1.1.13';
   // ECDSA-with-hash signature algorithm OIDs (ANSI X9.62 / RFC 5758).
   // Used in CMS SignerInfo.HashEncryptionAlgorithm when the signer key is
-  // ECDSA. Confusingly, "HashEncryptionAlgorithm" is the CMS field name —
+  // ECDSA. Confusingly, "HashEncryptionAlgorithm" is the CMS field name -
   // it's actually the *signature algorithm*, not an encryption algorithm.
   szOID_ECDSA_SHA256         : AnsiString = '1.2.840.10045.4.3.2';
   szOID_ECDSA_SHA384         : AnsiString = '1.2.840.10045.4.3.3';
@@ -378,7 +378,7 @@ const
   szOID_RSA_data             : AnsiString = '1.2.840.113549.1.7.1';
   szOID_RSA_signedData       : AnsiString = '1.2.840.113549.1.7.2';
   szOID_RFC3161_counterSign  : AnsiString = '1.3.6.1.4.1.311.3.3.1';
-  // RFC 5280 §5.3.1 — CRL entry extension carrying the revocation reason.
+  // RFC 5280 §5.3.1 - CRL entry extension carrying the revocation reason.
   szOID_CRL_REASON_CODE      : AnsiString = '2.5.29.21';
 
   // CRL reason code values (RFC 5280 §5.3.1). The X509_CRL_REASON_CODE
@@ -440,7 +440,7 @@ const
   X509_ALGORITHM_IDENTIFIER : PAnsiChar = PAnsiChar(74);
   // Encodes a bare OBJECT IDENTIFIER. pvStructInfo points to an LPSTR
   // (i.e. PAnsiChar*) whose target is the dotted-OID AnsiString. Defined
-  // in wincrypt.h as `(LPCSTR)73`. NB: 7 is X509_NAME — passing 7 here
+  // in wincrypt.h as `(LPCSTR)73`. NB: 7 is X509_NAME - passing 7 here
   // makes CryptEncodeObjectEx mis-parse the input and fail with E_OUTOFMEMORY.
   X509_OBJECT_IDENTIFIER  : PAnsiChar = PAnsiChar(73);
 
@@ -501,7 +501,7 @@ type
   end;
   PCMSG_SIGNER_ENCODE_INFO = ^CMSG_SIGNER_ENCODE_INFO;
 
-  // CMSG_SIGNER_INFO — accepted by CryptEncodeObjectEx(PKCS7_SIGNER_INFO).
+  // CMSG_SIGNER_INFO - accepted by CryptEncodeObjectEx(PKCS7_SIGNER_INFO).
   // Fully describes a SignerInfo: signer identity (Issuer + Serial),
   // hash algorithm, signature algorithm + value, and the signed +
   // unsigned attribute sets.
@@ -741,7 +741,7 @@ function CryptVerifyTimeStampSignature(pbTSContentInfo : PByte; cbTSContentInfo 
 procedure CryptMemFree(pv : Pointer); stdcall; external cCrypt32;
 
 // ---------------------------------------------------------------------------
-// Normaliz — Unicode normalization (used by manifest path validation)
+// Normaliz - Unicode normalization (used by manifest path validation)
 // ---------------------------------------------------------------------------
 
 const
@@ -764,7 +764,7 @@ function IsNormalizedString(NormForm : Integer; lpString : PWideChar;
   external cNormaliz;
 
 // ---------------------------------------------------------------------------
-// WinTrust — Authenticode verification of an executable (used by DPM.Core.Utils.PE)
+// WinTrust - Authenticode verification of an executable (used by DPM.Core.Utils.PE)
 // ---------------------------------------------------------------------------
 
 const

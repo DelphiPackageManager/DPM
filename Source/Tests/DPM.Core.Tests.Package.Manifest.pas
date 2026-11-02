@@ -1,6 +1,6 @@
 ﻿unit DPM.Core.Tests.Package.Manifest;
 
-// Phase 1 §1.12 — manifest emitter (M-1..M-12) and parser (V-2).
+// Phase 1 §1.12 - manifest emitter (M-1..M-12) and parser (V-2).
 
 interface
 
@@ -573,7 +573,7 @@ begin
     try
       fromArchive := service.GenerateFromArchive(archivePath, 'Same.Pkg', '1.0.0', haSha256);
       Assert.AreEqual(Length(fromFolder.Files), Length(fromArchive.Files));
-      // Per-entry hash equality is the strong assertion — same content, same hash.
+      // Per-entry hash equality is the strong assertion - same content, same hash.
       Assert.IsTrue(BytesEqual(fromFolder.Files[0].Hash, fromArchive.Files[0].Hash));
     finally
       if FileExists(archivePath) then
@@ -672,7 +672,7 @@ begin
     bytes := m.RawBytes;
     for i := 0 to Length(bytes) - 1 do
       Assert.AreNotEqual<Byte>(13, bytes[i],
-        Format('CR byte at offset %d — manifest must use LF only', [i]));
+        Format('CR byte at offset %d - manifest must use LF only', [i]));
   finally
     TDirectory.Delete(root, true);
   end;

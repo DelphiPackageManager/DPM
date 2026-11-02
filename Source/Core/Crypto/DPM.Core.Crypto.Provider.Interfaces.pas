@@ -43,17 +43,17 @@ type
   // OS sign in one shot via CryptSignMessage. They set IsLocal=true and
   // AcquirePrivateKey returns the handle pair.
   //
-  // Remote providers (Phase 3 §3.3 — Key Vault, Signotaur) don't have the
+  // Remote providers (Phase 3 §3.3 - Key Vault, Signotaur) don't have the
   // key locally. They set IsLocal=false and implement SignDigest: the CMS
   // layer pre-computes the digest of the to-be-signed bytes, hands it to
   // the provider, and gets the raw signature back. The provider knows
-  // nothing about CMS structure — only "sign these bytes with my key".
+  // nothing about CMS structure - only "sign these bytes with my key".
   ISigningProvider = interface
     ['{D90DD9C6-44B2-4C32-A3B1-5DD3D6E9D2BC}']
     function Certificate : ICertificate;
     /// <summary>
     /// True when the private key is in-process (cert store, PFX). False
-    /// for remote providers — those use SignDigest instead. The CMS layer
+    /// for remote providers - those use SignDigest instead. The CMS layer
     /// picks the code path based on this flag.
     /// </summary>
     function IsLocal : boolean;
@@ -77,7 +77,7 @@ type
     /// the private-key handle and keeps it alive until EndSession, so the card
     /// session (and any cached PIN) survives across multiple sign operations.
     /// Remote providers may use this to warm up auth tokens. Calling Sign
-    /// without an explicit BeginSession is still valid — providers acquire
+    /// without an explicit BeginSession is still valid - providers acquire
     /// what they need on demand and release immediately.
     /// </summary>
     procedure BeginSession;
@@ -103,7 +103,7 @@ type
   end;
   ENotImplementedSignDigest = class(ECryptoProvider);
   // Raised when the provider's session has failed in a way that won't be
-  // fixed by retrying the next file — bad credentials (401), service down
+  // fixed by retrying the next file - bad credentials (401), service down
   // (5xx), trust failures, etc. The batch sign loop treats this as fatal
   // regardless of --fail-fast and aborts the run instead of marching through
   // the remaining files with N more guaranteed failures.

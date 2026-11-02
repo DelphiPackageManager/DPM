@@ -124,7 +124,7 @@ var
 begin
   Assert(IsSamePackageVersion(item));
   merged := TPackageListItem.Create(FId, FCompilerVersion, FVersion, FPlatforms + item.Platforms);
-  // Signing status is per (id, compiler, version) so self and item agree —
+  // Signing status is per (id, compiler, version) so self and item agree -
   // propagate from self so the merged item still renders the signer.
   merged.FIsSigned := FIsSigned;
   merged.FSignedBy := FSignedBy;

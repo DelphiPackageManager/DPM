@@ -511,7 +511,7 @@ var
   raised : boolean;
   raisedMsg : string;
 begin
-  // A depends on Missing — no repo entry exists, so resolution fails. The resolver should not
+  // A depends on Missing - no repo entry exists, so resolution fails. The resolver should not
   // raise an exception when building the (partial) dependency graph for diagnostics.
   a := MakeInfo('A', '1.0.0', [MakeDep('Missing', '[1.0.0,1.0.99]')]);
 

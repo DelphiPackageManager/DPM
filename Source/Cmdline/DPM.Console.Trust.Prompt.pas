@@ -28,7 +28,7 @@ unit DPM.Console.Trust.Prompt;
 
 // CLI implementation of ITrustPromptStrategy. When stdin is a TTY, asks
 // the user for [o]verride/[c]ancel/[a]lways-block. When stdin is redirected
-// (CI), degrades to a hard block — the user can override at config level
+// (CI), degrades to a hard block - the user can override at config level
 // by setting authorDowngradePolicy=allow.
 
 interface

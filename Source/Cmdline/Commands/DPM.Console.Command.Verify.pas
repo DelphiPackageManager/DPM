@@ -161,7 +161,7 @@ begin
   // writes to stdout too (not stderr), so anything chatty has to be suppressed here
   // rather than relying on stream separation - and ForceNoBanner keeps the banner off.
   if flags.Offline and not options.JsonOutput then
-    Logger.Information('Offline mode — revocation will use cached CRL/OCSP responses only.');
+    Logger.Information('Offline mode - revocation will use cached CRL/OCSP responses only.');
 
   try
     verifyResult := FSigningService.VerifyPackage(options.PackageFile, policy, flags);
@@ -245,10 +245,10 @@ begin
       rsGood    : Logger.Information('  Revocation : checked, good');
       rsRevoked : Logger.Information('  Revocation : REVOKED', true);
       rsUnknown : Logger.Information('  Revocation : status unknown (CRL/OCSP unreachable)', true);
-      // rsNotChecked: silent — Phase 1 default
+      // rsNotChecked: silent - Phase 1 default
     end;
     case sigInfo.CurrentRevocationReason of
-      rrKeyCompromise         : Logger.Information('  Current status: REVOKED (keyCompromise) — retroactively invalid', true);
+      rrKeyCompromise         : Logger.Information('  Current status: REVOKED (keyCompromise) - retroactively invalid', true);
       rrCACompromise          : Logger.Information('  Current status: revoked (cACompromise)', true);
       rrSuperseded            : Logger.Information('  Current status: revoked (superseded)', true);
       rrAffiliationChanged    : Logger.Information('  Current status: revoked (affiliationChanged)', true);
@@ -282,7 +282,7 @@ begin
         Logger.Information('  Result     : valid (repository not trusted; ignored)');
     end
     else
-      Logger.Information('  Result:     INVALID — ' + sigInfo.FailureReason, true);
+      Logger.Information('  Result:     INVALID - ' + sigInfo.FailureReason, true);
 
     if (sigInfo.Role = srRepository) and sigInfo.Attestation.Present then
     begin

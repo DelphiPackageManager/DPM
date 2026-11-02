@@ -47,7 +47,7 @@ type
   ///<summary>A node in the project's dependency graph (DAG). Represents a package at a specific
   /// version chosen during resolution, plus the parent/children links that make up the graph.
   ///
-  /// Used during the RESOLUTION phase — the resolver builds/walks the graph, and the installer
+  /// Used during the RESOLUTION phase - the resolver builds/walks the graph, and the installer
   /// visits it DFS to compile packages and apply search paths in dependency order. Mutable: the
   /// resolver attaches children, sets PackageInfo, and records per-node state (UseSource).
   ///
@@ -68,10 +68,10 @@ type
 
     procedure SetUseSource(const value : boolean);
 
-    // Phase 2 §2.6 — project-level lock. Optional `manifestHash` attribute
+    // Phase 2 §2.6 - project-level lock. Optional `manifestHash` attribute
     // on the .dproj PackageReference element. When present, restore compares
     // the cached package's recorded manifest hash against this value and
-    // hard-fails a mismatch — equivalent to NuGet's packages.lock.json
+    // hard-fails a mismatch - equivalent to NuGet's packages.lock.json
     // content-hash check. Format matches receipt: "sha256:<hex>".
     function GetManifestHash : string;
     procedure SetManifestHash(const value : string);
@@ -164,11 +164,11 @@ type
   /// keyed implicitly by (Project, Package.Id). Created per resolved package and stored in the
   /// installer context so other projects in the same group can see the resolutions already made.
   ///
-  /// Used for cross-project / project-group CONFLICT DETECTION — if project A has resolved FooLib
+  /// Used for cross-project / project-group CONFLICT DETECTION - if project A has resolved FooLib
   /// at 1.2.0 and project B wants FooLib in a range that excludes 1.2.0, the resolver reports a
   /// conflict by inspecting the recorded IResolvedPackage entries.
   ///
-  /// No graph structure (no parent/children links) — that is IPackageReference's job. Clone(parentId)
+  /// No graph structure (no parent/children links) - that is IPackageReference's job. Clone(parentId)
   /// copies the record with a new ParentId so a sibling project in the group can adopt the same
   /// resolution under its own top-level.
   /// </summary>

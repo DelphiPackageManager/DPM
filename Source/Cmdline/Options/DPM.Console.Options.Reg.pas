@@ -957,7 +957,7 @@ begin
     end);
 
   cmd.RegisterOption<string>('api-key', '',
-    '[signotaur] API key as a literal value. Discouraged — visible in process ' +
+    '[signotaur] API key as a literal value. Discouraged - visible in process ' +
     'listings and shell history. Use --api-key-env instead when possible.',
     procedure(const value : string)
     begin

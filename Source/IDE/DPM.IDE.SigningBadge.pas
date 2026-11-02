@@ -30,7 +30,7 @@ unit DPM.IDE.SigningBadge;
 // and projects it into a small, display-ready record. PackageDetailsFrame
 // consumes this and renders the status header above the version selector.
 //
-// The receipt is the source of truth — we don't re-verify here. If no
+// The receipt is the source of truth - we don't re-verify here. If no
 // receipt exists (package not yet in the cache), we fall back to the
 // gallery-reported isSigned/signedBy fields off the feed, so users can
 // still see who signed a package before they install it. The local
@@ -76,7 +76,7 @@ type
     /// <summary>
     /// Shared implementation. When applyPinCheck is true, a 'trusted' receipt
     /// whose author signer is NOT in trustedPublisherSpkis is rendered as
-    /// sbsUntrustedPublisher (so the IDE can offer to pin the publisher) —
+    /// sbsUntrustedPublisher (so the IDE can offer to pin the publisher) -
     /// because in permissive mode the receipt records 'trusted' for any valid
     /// author signature regardless of the user's trusted-publishers list.
     /// </summary>
@@ -138,7 +138,7 @@ uses
 // Extract the Common Name from an X.500 DN string. Receipt stores the full
 // SignerSubject (e.g. "CN=VSoft Technologies, O=VSoft Technologies, L=...,
 // C=AU") which is far too long for the header label. Mirrors the parser on
-// TCertificate (see DPM.Core.Crypto.X509) — quote-aware so a CN containing
+// TCertificate (see DPM.Core.Crypto.X509) - quote-aware so a CN containing
 // a literal comma like CN="Foo, Bar" parses correctly.
 function ExtractCommonName(const dn : string) : string;
 const
@@ -278,7 +278,7 @@ var
   haveReceipt : boolean;
 begin
   result.State := sbsUnverified;
-  result.Caption := 'Unverified — install to verify';
+  result.Caption := 'Unverified - install to verify';
   result.Detail := '';
   result.AccentColor := $00808080;   // grey
   result.SignerSpkiHex := '';
@@ -294,7 +294,7 @@ begin
 
   if not haveReceipt then
   begin
-    // No local receipt — fall back to the gallery's advisory signing
+    // No local receipt - fall back to the gallery's advisory signing
     // fields if we have them. The CLI will still verify locally at
     // install time against the trust set; this is just so the user can
     // see who signed a package before they download it.
@@ -308,7 +308,7 @@ begin
       result.Detail :=
         'The gallery reports that this package version was signed at upload time.' +
         sLineBreak +
-        'The signature has not yet been verified locally — that happens on install ' +
+        'The signature has not yet been verified locally - that happens on install ' +
         'against your active trust set.';
       // Steel-blue: informational, distinct from trusted-green and amber-untrusted.
       result.AccentColor := $00B07020;
@@ -334,7 +334,7 @@ begin
   else if SameText(receipt.TrustDecision, 'trusted') then
   begin
     result.State := sbsSignedTrusted;
-    // Pick a display name from the first signature. Show just the CN —
+    // Pick a display name from the first signature. Show just the CN -
     // the full DN ("CN=..., O=..., L=..., S=..., C=AU") doesn't fit the
     // status header. The Detail dialog still carries the full subject.
     signerName := '';
@@ -344,7 +344,7 @@ begin
       begin
         signerName := ExtractCommonName(receipt.Signatures[i].SignerSubject);
         if signerName = '' then
-          // No CN parsed — fall back to the raw subject so the user still
+          // No CN parsed - fall back to the raw subject so the user still
           // sees *something* identifying the signer.
           signerName := receipt.Signatures[i].SignerSubject;
         break;
@@ -366,7 +366,7 @@ begin
     begin
       result.State := sbsUntrustedPublisher;
       if result.SignerName <> '' then
-        result.Caption := 'Signed by ' + result.SignerName + ' — not in your trusted publishers'
+        result.Caption := 'Signed by ' + result.SignerName + ' - not in your trusted publishers'
       else
         result.Caption := 'Signed, signer not in trusted publishers';
       result.AccentColor := $000080FF;   // amber
@@ -379,7 +379,7 @@ begin
     result.AccentColor := $002020D0;   // red
   end;
 
-  // Build the multi-line detail. Kept brief — the dialog can grow as
+  // Build the multi-line detail. Kept brief - the dialog can grow as
   // needed when we wire it up.
   result.Detail :=
     Format('Package: %s %s' + sLineBreak +

@@ -146,7 +146,7 @@ begin
     result := true;
     exit;
   end;
-  // Constant-time comparison — used for hash and signature digests.
+  // Constant-time comparison - used for hash and signature digests.
   diff := 0;
   for i := 0 to len - 1 do
     diff := diff or (a[i] xor b[i]);

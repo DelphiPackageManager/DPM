@@ -254,7 +254,7 @@ begin
                        .WithHeader(cUserAgentHeader,cDPMUserAgent);
 
   ForceDirectories(localFolder);
-  //Canonical .dpkg filename is {id}-{compiler}-{binPlatforms}-{version}.dpkg —
+  //Canonical .dpkg filename is {id}-{compiler}-{binPlatforms}-{version}.dpkg -
   //must match DPM.Core.Packaging.Writer.pas:463 and the cPackageFileRegex used
   //by the cache loader. packageInfo.ToString drops the platforms segment.
   destFile := IncludeTrailingPathDelimiter(localFolder)

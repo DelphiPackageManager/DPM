@@ -145,7 +145,7 @@ begin
       [y, m, d, hh, nn, ss, ms])
   else
   begin
-    // Local-time form — append the local timezone offset from UTC.
+    // Local-time form - append the local timezone offset from UTC.
     ts := TTimeZone.Local.GetUtcOffset(value);
     offsetMinutes := Round(ts.TotalMinutes);
     if offsetMinutes < 0 then
@@ -167,7 +167,7 @@ end;
 // Canonicalise input for the RTL ISO8601 parser. The RTL implementation
 // in Delphi 12 strictly requires uppercase 'T' as the date/time prefix and
 // uppercase 'Z' as the UTC marker, and does not accept a space separator
-// between date and time. Our polyfill contract is lenient on all three —
+// between date and time. Our polyfill contract is lenient on all three -
 // when delegating to the RTL we canonicalise first so callers don't have
 // to care which branch their input is going through.
 function CanonicaliseISO8601(const value : string) : string;
@@ -244,7 +244,7 @@ begin
       ExpectChar(value, pos, ':');
       ss := ReadInt(value, pos, 2);
 
-      // Optional fractional seconds — accept any digit count, truncate to ms.
+      // Optional fractional seconds - accept any digit count, truncate to ms.
       if (pos <= Length(value)) and ((value[pos] = '.') or (value[pos] = ',')) then
       begin
         Inc(pos);

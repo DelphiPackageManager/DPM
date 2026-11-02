@@ -110,7 +110,7 @@ type
     // IDE-2: programmatic signing-status badge that sits above the version
     // selector. Painted via TPaintBox (not TLabel) because the IDE's
     // IOTAIDEThemingServices.ApplyTheme walks every TLabel descendant and
-    // resets Font.Color to clWindowText regardless of StyleElements — so the
+    // resets Font.Color to clWindowText regardless of StyleElements - so the
     // green/amber/red tint never reaches the screen on a TLabel. A paint
     // box's OnPaint isn't touched by the theming service.
     FSigningLabel : TPaintBox;
@@ -774,7 +774,7 @@ begin
   // Built as a TPaintBox + custom OnPaint because the IDE theming service
   // (IOTAIDEThemingServices.ApplyTheme) walks every TLabel descendant and
   // forces Font.Color back to clWindowText, ignoring StyleElements. A paint
-  // box paints whatever its OnPaint draws — the theming service has no hook
+  // box paints whatever its OnPaint draws - the theming service has no hook
   // into our pen colour.
   FSigningLabel := TPaintBox.Create(Self);
   FSigningLabel.Parent := pnlPackageId;
@@ -1225,14 +1225,14 @@ begin
   end;
   // Pass the gallery-reported signing fields through. When the package
   // hasn't been installed yet there's no local receipt, but the feed
-  // already carries isSigned/signedBy — the badge falls back to those so
+  // already carries isSigned/signedBy - the badge falls back to those so
   // the user sees the signer name before they install.
   badge := TSigningBadgeResolver.Resolve(FPackageCache, FReceiptService, package.Id, package.Version, IDECompilerVersion,
                                           package.IsSigned, package.SignedBy, trustedSpkis);
   FCurrentBadge := badge;
   // Size the paint box to fit the caption. Canvas.Font inherits from the
   // paint box's font, which inherits from the parent frame via ParentFont
-  // — so we measure with exactly the same font used at paint time.
+  // - so we measure with exactly the same font used at paint time.
   textSize := FSigningLabel.Canvas.TextExtent(badge.Caption);
   FSigningLabel.Width := textSize.cx + 2;
   FSigningLabel.Height := textSize.cy;
@@ -1382,7 +1382,7 @@ begin
 
   // FSigningLabel is a TPaintBox that draws via SigningLabelPaint, which
   // reads FCurrentBadge.AccentColor on every paint. A theme change just
-  // needs to trigger a repaint — there is no Font.Color to re-assert.
+  // needs to trigger a repaint - there is no Font.Color to re-assert.
   if (FSigningLabel <> nil) and FSigningLabel.Visible then
     FSigningLabel.Invalidate;
 end;

@@ -81,7 +81,7 @@ type
     // install may proceed. Hard-fails when a previously seen trusted-repo
     // signature is now missing or the namespace has changed.
     // `hadPriorAuthor`/`priorAuthor` must be captured by the caller *before*
-    // EvaluateAuthorDowngrade runs — see TAuthorRebuildExemption.
+    // EvaluateAuthorDowngrade runs - see TAuthorRebuildExemption.
     function EvaluateRepositoryRatchet(const packageId : IPackageIdentity;
                                         const verifyResult : TVerificationResult;
                                         hadPriorAuthor : boolean;
@@ -89,7 +89,7 @@ type
     // Materialise a TVerificationResult from a cached receipt so the trust-
     // state ratchets can be re-evaluated on a cache hit without re-extracting.
     // Trust-set membership (PublisherTrusted/RepositoryTrusted) is re-checked
-    // against the *current* policy — the receipt is only the signature roster.
+    // against the *current* policy - the receipt is only the signature roster.
     function BuildResultFromReceipt(const receipt : TVerificationReceipt) : TVerificationResult;
     //InstallPackageFromFile, reporting through logger - a TDemotingLogger when trying a .dpkg left on disk,
     //whose problems are not the operation's because the package is downloaded again.
@@ -476,7 +476,7 @@ begin
   currentAttestedNamespace := '';
 
   // First valid trusted repository signature on this build (its attestation
-  // — if present — sets the namespace we ratchet against).
+  // - if present - sets the namespace we ratchet against).
   for i := 0 to High(verifyResult.Signatures) do
   begin
     if (verifyResult.Signatures[i].Role = srRepository) and
@@ -495,7 +495,7 @@ begin
 
   if not hadPrior then
   begin
-    // First time seeing this id — if it carries a trusted repo signature,
+    // First time seeing this id - if it carries a trusted repo signature,
     // record the high-water mark. If not, nothing to do.
     if hasCurrentTrustedRepo then
     begin
@@ -511,7 +511,7 @@ begin
   // V-24: once seen carrying a trusted-repo signature, any later build
   // lacking one or attesting a different namespace would normally be a hard
   // fail. We now prompt the user (when a UI is wired) so dev workflows can
-  // recover without hand-editing trust-state.yaml — the non-interactive
+  // recover without hand-editing trust-state.yaml - the non-interactive
   // strategy still fails closed for CI.
   ratchetFailure := '';
   missingRepoSignature := not hasCurrentTrustedRepo;
@@ -602,7 +602,7 @@ begin
     end;
   end;
 
-  // No regression — update the high-water mark and ratchet forward.
+  // No regression - update the high-water mark and ratchet forward.
   newEntry := prior;
   newEntry.TrustedRepoSpkiHex := currentTrustedRepoSpki;
   if currentAttestedNamespace <> '' then
@@ -715,7 +715,7 @@ begin
     else
       receipt.Signatures[i].RevocationStatus := 'notChecked';
     end;
-    // P2 §2.2 — attestation block is only set when present on this signature
+    // P2 §2.2 - attestation block is only set when present on this signature
     // (the verifier only populates it for trusted-repo sigs).
     if verifyResult.Signatures[i].Attestation.Present then
     begin
@@ -855,7 +855,7 @@ begin
     exit;
 
   // Identify the first valid author signature on the current build. We only
-  // record valid signers — a broken signature does not feed the ratchet.
+  // record valid signers - a broken signature does not feed the ratchet.
   currentSigned := false;
   currentSpki := '';
   currentSubject := '';
@@ -883,7 +883,7 @@ begin
     exit;
   end;
 
-  // First-ever install for this id — nothing to compare against. Record and
+  // First-ever install for this id - nothing to compare against. Record and
   // proceed (TOFU).
   if not hadPrior then
   begin
@@ -899,7 +899,7 @@ begin
   // Was there a real downgrade vs. the previous high-water mark?
   // 1) previously signed, now unsigned: downgrade
   // 2) previously signed by X, now signed by Y (Y <> X): key change (also a downgrade)
-  // 3) previously unsigned, now signed: upgrade — silently accept and ratchet
+  // 3) previously unsigned, now signed: upgrade - silently accept and ratchet
   // 4) previously unsigned, now unsigned: no change
   // 5) same SPKI as last time: no change
   isDowngrade := prior.LastSeenAuthorSigned and not currentSigned;
@@ -908,7 +908,7 @@ begin
 
   if not (isDowngrade or isKeyChange) then
   begin
-    // No-downgrade — update last-seen if anything changed.
+    // No-downgrade - update last-seen if anything changed.
     if (prior.LastAuthorSpkiHex <> currentSpki) or
        (prior.LastSeenAuthorSigned <> currentSigned) then
     begin
@@ -916,7 +916,7 @@ begin
       newEntry.LastAuthorSpkiHex    := currentSpki;
       newEntry.LastSeenAuthorSigned := currentSigned;
       newEntry.LastSeenAt           := TTimeZone.Local.ToUniversalTime(Now);
-      // Once author has signed, lock that in — even an unsigned re-install
+      // Once author has signed, lock that in - even an unsigned re-install
       // would have already failed the downgrade check above.
       if currentSigned then
         newEntry.DowngradeAcknowledged := false;
@@ -1677,7 +1677,7 @@ begin
     begin
       // QuickRecheck only verifies the cached extraction against the trust
       // *policy*. The trust *state* (per-package TOFU history) can change
-      // independently — manual edits to trust-state.yaml or an intervening
+      // independently - manual edits to trust-state.yaml or an intervening
       // install that ratcheted a different signer. Re-run both ratchets
       // against the signatures recorded in the receipt so cache hits don't
       // bypass the author / V-24 protections. Skipped entirely while the cache
@@ -1686,7 +1686,7 @@ begin
       // block its own freshly-cached entry.
       cachedVerifyResult := BuildResultFromReceipt(receipt);
       // Read the author high-water mark before EvaluateAuthorDowngrade ratchets
-      // it forward — the repository ratchet's author-rebuild exemption compares
+      // it forward - the repository ratchet's author-rebuild exemption compares
       // against the *prior* identity, not the one about to be recorded.
       hadPriorAuthor := FTrustState.TryGetAuthor(packageId.Id, priorAuthor);
       if not EvaluateAuthorDowngrade(packageId, cachedVerifyResult, FTrustPolicy.GetEffectivePolicy) then
@@ -1703,7 +1703,7 @@ begin
   end;
 
   // Only fall back to the .dpkg when the cached extraction is missing or
-  // stale. A ratchet block is the user's explicit decision — re-installing
+  // stale. A ratchet block is the user's explicit decision - re-installing
   // from the .dpkg would just trigger the same prompt again.
   if (not result) and (not ratchetBlocked) then
   begin
@@ -1890,7 +1890,7 @@ var
 begin
   result := false;
   placed := false;
-  // Signing — the central verification gate (architecture doc §Verification
+  // Signing - the central verification gate (architecture doc §Verification
   // Workflow, plan §1.7). Verify the package *before* extraction so a hostile
   // archive never gets written to disk. The signing service is optional:
   // tests/legacy harnesses that don't wire DI can skip it.
@@ -1955,7 +1955,7 @@ begin
     else
     begin
       // Read the author high-water mark before EvaluateAuthorDowngrade ratchets
-      // it forward — the repository ratchet's author-rebuild exemption compares
+      // it forward - the repository ratchet's author-rebuild exemption compares
       // against the *prior* identity, not the one about to be recorded.
       hadPriorAuthor := (FTrustState <> nil) and
                         FTrustState.TryGetAuthor(packageIndentity.Id, priorAuthor);
@@ -1967,7 +1967,7 @@ begin
         exit;
 
       // P2 §2.3 (V-24): repository assurance ratchet. Once seen carrying a
-      // trusted-repo signature, future builds must continue to — unless this is
+      // trusted-repo signature, future builds must continue to - unless this is
       // the author rebuilding their own package (TAuthorRebuildExemption).
       if not EvaluateRepositoryRatchet(packageIndentity, verifyResult, hadPriorAuthor, priorAuthor) then
         exit;
@@ -2049,7 +2049,7 @@ begin
       logger.Verbose('Package  [' + packageFilePath + '] added to cache.');
 
     // Write the verification receipt as the FINAL step of a successful
-    // verify-and-extract — V-31. Its presence is the signal that extraction
+    // verify-and-extract - V-31. Its presence is the signal that extraction
     // completed; a crash leaves no receipt and we re-fetch on next use.
     if result and (FReceiptService <> nil) and (FSigningService <> nil) then
       WriteReceipt(packageFolder, packageIndentity, verifyResult);

@@ -1,6 +1,6 @@
 unit DPM.Core.Tests.Trust.AuthorRebuild;
 
-// Truth table for TAuthorRebuildExemption.Applies — the escape hatch that lets a
+// Truth table for TAuthorRebuildExemption.Applies - the escape hatch that lets a
 // package author install a locally built copy of an id they have already
 // published, without the V-24 repository ratchet blocking it.
 //
@@ -24,18 +24,18 @@ type
     [Test] procedure Applies_IsCaseInsensitive_OnSpkiHex;
     [Test] procedure Applies_WhenMatchingSigIsNotFirstInArray;
 
-    // Denied — nothing recorded to match against.
+    // Denied - nothing recorded to match against.
     [Test] procedure Denied_WhenNoPriorAuthorEntry;
     [Test] procedure Denied_WhenPriorEntryWasUnsigned;
     [Test] procedure Denied_WhenPriorSpkiIsEmpty;
 
-    // Denied — the current build cannot prove the author identity.
+    // Denied - the current build cannot prove the author identity.
     [Test] procedure Denied_WhenBuildHasNoSignatures;
     [Test] procedure Denied_WhenAuthorSigIsInvalid;
     [Test] procedure Denied_WhenAuthorSigIsFromDifferentKey;
     [Test] procedure Denied_WhenOnlyRepoSigMatchesPriorSpki;
 
-    // Denied — user decision outranks the exemption.
+    // Denied - user decision outranks the exemption.
     [Test] procedure Denied_WhenPackagePermanentlyBlocked;
   end;
 
@@ -106,7 +106,7 @@ begin
     MakePriorAuthor(cAuthorSpki, true), sigs));
 end;
 
-{ denied — nothing recorded to match against }
+{ denied - nothing recorded to match against }
 
 procedure TAuthorRebuildExemptionTests.Denied_WhenNoPriorAuthorEntry;
 var
@@ -123,7 +123,7 @@ var
   sigs : TArray<TSignatureInfo>;
 begin
   // The id was last seen unsigned, so no author identity was ever established
-  // for it — a signature now proves nothing about who published it before.
+  // for it - a signature now proves nothing about who published it before.
   SetLength(sigs, 1);
   sigs[0] := MakeSig(srAuthor, cAuthorSpki, true);
   Assert.IsFalse(TAuthorRebuildExemption.Applies(true,
@@ -140,7 +140,7 @@ begin
     MakePriorAuthor('', true), sigs));
 end;
 
-{ denied — current build cannot prove the author identity }
+{ denied - current build cannot prove the author identity }
 
 procedure TAuthorRebuildExemptionTests.Denied_WhenBuildHasNoSignatures;
 var
@@ -155,7 +155,7 @@ procedure TAuthorRebuildExemptionTests.Denied_WhenAuthorSigIsInvalid;
 var
   sigs : TArray<TSignatureInfo>;
 begin
-  // Right key, but the signature did not verify — it proves nothing.
+  // Right key, but the signature did not verify - it proves nothing.
   SetLength(sigs, 1);
   sigs[0] := MakeSig(srAuthor, cAuthorSpki, false);
   Assert.IsFalse(TAuthorRebuildExemption.Applies(true,
@@ -185,7 +185,7 @@ begin
     MakePriorAuthor(cAuthorSpki, true), sigs));
 end;
 
-{ denied — user decision outranks the exemption }
+{ denied - user decision outranks the exemption }
 
 procedure TAuthorRebuildExemptionTests.Denied_WhenPackagePermanentlyBlocked;
 var

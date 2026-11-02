@@ -97,7 +97,7 @@ var
   logger : ILogger;
   specReader : IPackageSpecReader;
 begin
-  // GetPackageHash predates signing — pass nil for the signing/trust/receipt
+  // GetPackageHash predates signing - pass nil for the signing/trust/receipt
   // deps. The cache code guards each with `if FSigningService <> nil` etc.
   // Hold the constructed deps in interface locals first: creating an interfaced
   // object directly in a parameter position can leak in Delphi.

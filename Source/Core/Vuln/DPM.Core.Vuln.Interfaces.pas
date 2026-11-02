@@ -99,7 +99,7 @@ type
   end;
 
   ///<summary>Orchestrator. Walks an SBOM, queries the configured database,
-  /// builds a TVulnReport. Does not write — the writer is a separate stage so
+  /// builds a TVulnReport. Does not write - the writer is a separate stage so
   /// the same scanner output can drive multiple output formats.</summary>
   IVulnScanner = interface
     ['{3F8C1A2B-4D6E-4F7A-8B9C-2E0D5A6C8F1A}']

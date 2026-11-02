@@ -53,7 +53,7 @@ type
     Value : string;
   end;
 
-  ///<summary>One unit-of-evidence — typically a source file path discovered in the linker MAP file
+  ///<summary>One unit-of-evidence - typically a source file path discovered in the linker MAP file
   /// that places this component in the binary. Surfaces as `evidence.occurrences[]` in CycloneDX
   /// and as an `annotations[]` entry in SPDX.</summary>
   TSBOMEvidence = record
@@ -74,7 +74,7 @@ type
     Incomplete    // the list is what could be seen, there may be more
   );
 
-  ///<summary>One component in the SBOM. Plain class (not interfaced) — the report owns
+  ///<summary>One component in the SBOM. Plain class (not interfaced) - the report owns
   /// the list and disposes them. Most string fields are optional and emit only when non-empty.
   ///</summary>
   TSBOMComponent = class

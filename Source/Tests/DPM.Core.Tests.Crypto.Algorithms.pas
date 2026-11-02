@@ -1,6 +1,6 @@
 unit DPM.Core.Tests.Crypto.Algorithms;
 
-// Direct tests for TAlgorithmProfile — the V-16 / S-5 allowlist. Every hash
+// Direct tests for TAlgorithmProfile - the V-16 / S-5 allowlist. Every hash
 // digest / signature decision in the verifier funnels through this profile;
 // these tests pin the answers so a future "fix" to broaden the allowlist
 // can't slip through without a test going red.
@@ -24,7 +24,7 @@ type
     [Test] procedure CmsDigest_AllowsSHA512;
     [Test] procedure CmsDigest_RejectsUnknown;
 
-    // TimestampDigestAllowed — Phase 1: SHA-256 only
+    // TimestampDigestAllowed - Phase 1: SHA-256 only
     [Test] procedure TimestampDigest_AllowsSHA256_Only;
 
     // SignatureAlgorithmAllowed by OID

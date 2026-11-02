@@ -65,7 +65,7 @@ type
   TTrustPolicy = record
     ValidationMode         : TValidationMode;
     AuthorDowngradePolicy  : TAuthorDowngradePolicy;
-    AllowKeyCompromiseOverride : boolean;   // P3 — read in P1 for fingerprint stability
+    AllowKeyCompromiseOverride : boolean;   // P3 - read in P1 for fingerprint stability
     TrustedPublishers      : TArray<TTrustedPublisher>;
     TrustedRepositories    : TArray<TTrustedRepository>;
     TrustSetVersion        : integer;
@@ -100,7 +100,7 @@ type
     LastSeenAuthorSigned : boolean;
     LastSeenAt           : TDateTime;
     DowngradeAcknowledged : boolean;
-    // If true, the user previously picked "Always block" for this id —
+    // If true, the user previously picked "Always block" for this id -
     // subsequent installs are rejected without re-prompting, regardless of
     // any change to the new signer.
     BlockedPermanently   : boolean;
@@ -111,7 +111,7 @@ type
   // attesting namespace N, any future install lacking such a signature
   // (or attesting a different namespace) is a hard failure regardless of
   // the global trust mode. This ratchet is keyed strictly to *trusted*
-  // repositories — an attacker running their own repo cannot satisfy it.
+  // repositories - an attacker running their own repo cannot satisfy it.
   TRepositoryTrustEntry = record
     TrustedRepoSpkiHex   : string;    // the trusted repo SPKI we ratcheted to
     Namespace            : string;    // attested namespace (e.g. "VSoft.*")
@@ -126,7 +126,7 @@ type
     procedure AcknowledgeAuthorDowngrade(const packageId : string);
     procedure BlockPermanently(const packageId : string);
     // Drop the author entry for this package id. Used when the user explicitly
-    // overrides an author-downgrade prompt — the next install is treated as
+    // overrides an author-downgrade prompt - the next install is treated as
     // first-ever (fresh TOFU) rather than another downgrade.
     procedure RemoveAuthor(const packageId : string);
 

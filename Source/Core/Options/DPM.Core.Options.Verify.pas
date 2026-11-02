@@ -47,7 +47,7 @@ type
 
     property PackageFile : string read FPackageFile write FPackageFile;
     property Offline : boolean read FOffline write FOffline;
-    // P3 §3.5 — when true, dpm verify emits a single JSON object on stdout
+    // P3 §3.5 - when true, dpm verify emits a single JSON object on stdout
     // (no banner, no human-readable lines) so CI pipelines can parse it.
     property JsonOutput : boolean read FJsonOutput write FJsonOutput;
   end;

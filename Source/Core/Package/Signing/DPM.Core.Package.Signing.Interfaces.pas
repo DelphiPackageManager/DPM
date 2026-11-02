@@ -57,14 +57,14 @@ type
     // SHA-256 (hex) of every author signature blob this repo sig co-signed,
     // as carried in the multi-value dpmVerifiedAuthorSigHash signed
     // attribute on the repository signature. One entry per attested author
-    // (CMS attribute values are SET OF — gallery emits one hash per
+    // (CMS attribute values are SET OF - gallery emits one hash per
     // registered-publisher author sig present in the archive).
     //
     // Empty array means the attribute was absent (older gallery versions)
     // or empty. The verifier requires every listed hash to resolve to an
     // author signature actually present in the archive, AND requires the
     // primary AuthorSpkiHex to match the signer of at least one of those
-    // resolved sigs — the cryptographic binding between "gallery attested
+    // resolved sigs - the cryptographic binding between "gallery attested
     // these authors" and "the author signatures actually present came from
     // them".
     BoundAuthorSigHashesHex : TArray<string>;
@@ -98,7 +98,7 @@ type
     FailureReason      : string;
     Attestation        : TRepositoryAttestation;   // P2: repository attestation
     Revocation         : TRevocationStatus;        // P3: revocation outcome at signing time
-    // P3 §3.1 follow-up — *current* revocation reason from a second chain
+    // P3 §3.1 follow-up - *current* revocation reason from a second chain
     // build without pTime. When = rrKeyCompromise, the signature is treated
     // as retroactively invalid unless TTrustPolicy.AllowKeyCompromiseOverride.
     CurrentRevocationReason : TRevocationReason;
@@ -165,7 +165,7 @@ type
   // folder, install to test, push to the gallery afterwards) produces a build
   // that legitimately carries no gallery repository signature. Without an
   // exemption the ratchet blocks that install on every release after the id's
-  // first — the ratchet is keyed on package id alone and cannot otherwise tell
+  // first - the ratchet is keyed on package id alone and cannot otherwise tell
   // an author's own rebuild from a third party shadowing the id.
   //
   // The exemption is granted only when the new build carries a valid author
@@ -186,7 +186,7 @@ type
   end;
 
   TVerifyFlags = record
-    Offline : boolean;   // P3 §3.2 — skip CRL/OCSP network calls
+    Offline : boolean;   // P3 §3.2 - skip CRL/OCSP network calls
   end;
 
   IPackageSigningService = interface
@@ -201,13 +201,13 @@ type
                           const options : ISignOptions);
 
     /// <summary>
-    /// Full Verification Workflow — used by `dpm verify` and as the central
+    /// Full Verification Workflow - used by `dpm verify` and as the central
     /// gate inside TPackageCache.InstallPackageFromFile.
     /// </summary>
     function VerifyPackage(const packageFilePath : string;
                            const policy : TTrustPolicy) : TVerificationResult; overload;
     /// <summary>
-    /// P3 §3.2 — variant that takes runtime flags (offline mode etc.) so the
+    /// P3 §3.2 - variant that takes runtime flags (offline mode etc.) so the
     /// CLI `dpm verify --offline` can skip CRL/OCSP fetches.
     /// </summary>
     function VerifyPackage(const packageFilePath : string;
@@ -216,7 +216,7 @@ type
 
     /// <summary>
     /// Quick re-check on a cache hit. Re-hashes only the manifest and
-    /// compares against the receipt — no CMS, no chain build.
+    /// compares against the receipt - no CMS, no chain build.
     /// </summary>
     function QuickRecheck(const cacheFolder : string;
                           const policy : TTrustPolicy) : boolean;
@@ -273,7 +273,7 @@ begin
     exit;
 
   // SameText rather than a hex normalisation pass, to stay consistent with the
-  // author ratchet's own key-change comparison — both sides of this test come
+  // author ratchet's own key-change comparison - both sides of this test come
   // from TSignatureInfo.SignerSpkiHex, so the formats already agree.
   for i := 0 to High(signatures) do
     if (signatures[i].Role = srAuthor) and signatures[i].Valid and

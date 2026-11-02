@@ -26,7 +26,7 @@
 
 unit DPM.Core.Package.Manifest;
 
-// dpm-manifest.json — generation, parsing, and path-safety enforcement.
+// dpm-manifest.json - generation, parsing, and path-safety enforcement.
 //
 // Generation uses a purpose-built deterministic emitter (M-4). The emitter
 // writes a fixed key sequence in lexicographic order, a sorted `files`
@@ -35,7 +35,7 @@ unit DPM.Core.Package.Manifest;
 //
 // Parsing uses VSoft.YAML with DuplicateKeyBehavior=dkError and our own
 // depth and size limits (V-2). The signed-content bytes are the exact
-// stored bytes — never re-emitted (V-1).
+// stored bytes - never re-emitted (V-1).
 
 interface
 
@@ -226,7 +226,7 @@ begin
   end;
 end;
 
-// JSON string escape per RFC 8259 — single-line, integer-only schema so the
+// JSON string escape per RFC 8259 - single-line, integer-only schema so the
 // escape set is small.
 function JsonEscape(const value : string) : string;
 var
@@ -669,7 +669,7 @@ var
   sb : TStringBuilder;
   i : integer;
 begin
-  // Deterministic emitter — fixed key order (lexicographic), LF only, integers
+  // Deterministic emitter - fixed key order (lexicographic), LF only, integers
   // only, no insignificant whitespace.
   //
   // Keys in lex order: created, dpmPackageFormat, files, hashAlgorithm,
@@ -803,7 +803,7 @@ begin
     for i := 0 to zip.FileCount - 1 do
     begin
       name := zip.FileName[i];
-      // Strip directory entries (trailing slash) — they aren't real files.
+      // Strip directory entries (trailing slash) - they aren't real files.
       if (Length(name) > 0) and ((name[Length(name)] = '/') or (name[Length(name)] = '\')) then
         Continue;
 
@@ -819,7 +819,7 @@ begin
       if not ValidatePath(canonical, reason) then
         raise EManifestPath.CreateFmt('Refusing to include "%s": %s', [canonical, reason]);
 
-      // RTL TBytes overload — reads from the entry's correct position. The
+      // RTL TBytes overload - reads from the entry's correct position. The
       // stream overload + ms.Size/ms.Position corrupts STORED entries on Delphi
       // 10.2 (wrong Size, and Position:=0 seeks to the archive start), which
       // would bake a wrong size+hash into the manifest.

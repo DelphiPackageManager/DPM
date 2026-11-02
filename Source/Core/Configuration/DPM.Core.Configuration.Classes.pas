@@ -450,7 +450,7 @@ end;
 constructor TSigningConfig.Create;
 begin
   inherited Create;
-  // Architecture doc defaults — see plan §1.11.
+  // Architecture doc defaults - see plan §1.11.
   FValidationMode := 'permissive';
   FAuthorDowngradePolicy := 'prompt';
   FAllowKeyCompromiseOverride := false;

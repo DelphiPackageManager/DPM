@@ -106,7 +106,7 @@ begin
   // FF FF FF in standard base64 is "////"; base64url substitutes to "____".
   // Pick a byte pattern that produces '+' and '/' in standard base64 so we
   // confirm both substitutions kick in.
-  raw := BytesFromHex('FBFFBF');   // → standard base64 "+/+/" — wait, check:
+  raw := BytesFromHex('FBFFBF');   // → standard base64 "+/+/" - wait, check:
   // 0xFB = 11111011
   // 0xFF = 11111111
   // 0xBF = 10111111
@@ -160,7 +160,7 @@ end;
 
 procedure TBase64UrlTests.Decode_RejectsInvalidLength;
 begin
-  // 5 chars after padding restoration would be invalid — base64 has only
+  // 5 chars after padding restoration would be invalid - base64 has only
   // 0, 2, or 3 leftover chars after multiples of 4. We catch this and raise
   // rather than feed garbage to the inner decoder.
   Assert.WillRaise(
@@ -191,7 +191,7 @@ var
   original, decoded : TBytes;
   i : integer;
 begin
-  // Short inputs of every length 0..15 — catches off-by-one in padding
+  // Short inputs of every length 0..15 - catches off-by-one in padding
   // handling for any boundary.
   for i := 0 to 15 do
   begin

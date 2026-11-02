@@ -49,7 +49,7 @@ type
     function HashAlgorithm : THashAlgorithm;
     function Created : TDateTime;
     function Files : TArray<TManifestFileEntry>;
-    function RawBytes : TBytes;   // exact signed bytes — never re-emitted
+    function RawBytes : TBytes;   // exact signed bytes - never re-emitted
   end;
 
   IManifestService = interface
@@ -59,7 +59,7 @@ type
                       const version : string;
                       algorithm : THashAlgorithm) : IPackageManifest;
 
-    // Generate a manifest from an already-built .dpkg archive — used by
+    // Generate a manifest from an already-built .dpkg archive - used by
     // the pack command after FArchiveWriter has finished writing entries.
     // Excludes dpm-manifest.json and signatures/** automatically.
     function GenerateFromArchive(const archivePath : string;

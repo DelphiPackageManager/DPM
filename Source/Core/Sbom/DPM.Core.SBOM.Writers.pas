@@ -75,7 +75,7 @@ const
   cSpdxNamespacePrefix = 'https://github.com/DelphiPackageManager/DPM/spdxdocs/';
 
 //Normalises a hash algorithm name to the CycloneDX hashAlg enum. CycloneDX 1.6 hashes[].alg
-//must be one of MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, ... — exact spelling matters
+//must be one of MD5, SHA-1, SHA-256, SHA-384, SHA-512, SHA3-256, ... - exact spelling matters
 //for downstream validation.
 function CycloneDXHashAlg(const value : string) : string;
 var

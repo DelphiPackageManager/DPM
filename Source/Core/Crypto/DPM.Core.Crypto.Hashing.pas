@@ -27,7 +27,7 @@
 unit DPM.Core.Crypto.Hashing;
 
 // SHA-256/384/512 hashing over Windows CNG (BCrypt). One algorithm provider
-// per algorithm is held in a singleton, reused across hashers — opening a
+// per algorithm is held in a singleton, reused across hashers - opening a
 // new provider per hash is measurably slow.
 //
 // Files are streamed in 64KB chunks, never loaded whole.

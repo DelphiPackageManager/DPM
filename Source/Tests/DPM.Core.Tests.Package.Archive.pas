@@ -639,7 +639,7 @@ begin
   validator := NewValidator;
   path := MakeTempPath('dup');
   try
-    // System.Zip happily lets us write two entries with the same name —
+    // System.Zip happily lets us write two entries with the same name -
     // this is precisely the V-9 attack we reject.
     BuildArchive(path, [
       'foo.pas', 'unit Foo; end.',
@@ -719,7 +719,7 @@ begin
   validator := NewValidator;
   path := MakeTempPath('backslash');
   try
-    // Path-safety rejects backslash separators — must use forward slashes only.
+    // Path-safety rejects backslash separators - must use forward slashes only.
     BuildArchive(path, [
       'lib\foo.pas', 'unit Foo; end.'
     ]);

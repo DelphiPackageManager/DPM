@@ -46,7 +46,7 @@ type
     procedure Apply(const projectXml : IXMLDOMDocument; const compiler : TCompilerVersion);
   end;
 
-  //Mutating editor used by the prepare command. Distinct from TProjectEditor — that
+  //Mutating editor used by the prepare command. Distinct from TProjectEditor - that
   //class is restore-time and centred on DPM package references / search paths. The
   //transformer focuses on producing per-version-correct .dproj files at authoring time.
   IProjectTransformer = interface
@@ -464,7 +464,7 @@ begin
       exit;
     end;
 
-    //use a match evaluator so the new suffix is treated as a literal — otherwise
+    //use a match evaluator so the new suffix is treated as a literal - otherwise
     //replacement-string substitution would interpret `$(...)` sequences specially.
     //assigning an instance method to a TMatchEvaluator works around a Delphi
     //overload-resolution issue with inline anonymous functions (see TPackageWriter

@@ -27,7 +27,7 @@
 unit DPM.Core.Vuln.Types;
 
 { Vulnerability scan domain types. These are the post-database, pre-writer
-  shapes — the OSV client maps the raw OSV record into these, the scanner
+  shapes - the OSV client maps the raw OSV record into these, the scanner
   groups them into a TVulnReport, and writers serialise to CycloneDX VEX
   (or future formats). }
 

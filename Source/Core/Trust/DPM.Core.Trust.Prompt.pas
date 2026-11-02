@@ -32,7 +32,7 @@ unit DPM.Core.Trust.Prompt;
 // Three implementations:
 //   - TNonInteractiveTrustPromptStrategy : default in Core; always denies.
 //     Used in headless contexts (CI tests, anything where no UI/stdin is
-//     reachable). Safe default — fails closed.
+//     reachable). Safe default - fails closed.
 //   - TConsoleTrustPromptStrategy (DPM.Console.Trust.Prompt) : CLI [y/N]
 //     prompt on stdin.
 //   - TIdeTrustPromptStrategy (DPM.IDE.Trust.Prompt) : wraps the modal

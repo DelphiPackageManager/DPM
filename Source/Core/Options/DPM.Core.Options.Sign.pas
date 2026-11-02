@@ -34,7 +34,7 @@ uses
 
 type
   TSignStoreLocation = (sslCurrentUser, sslLocalMachine);
-  // Phase 3 §3.3 — provider selector. Default is the legacy cert-store /
+  // Phase 3 §3.3 - provider selector. Default is the legacy cert-store /
   // PFX path; --provider keyvault / signotaur route to a remote provider.
   TSignProvider = (spLocal, spKeyVault, spSignotaur);
 
@@ -59,7 +59,7 @@ type
     FPfxPassword : string;
     FTimestampUrl : string;
     FDigest : string;
-    // P3 §3.3 — remote-provider options
+    // P3 §3.3 - remote-provider options
     FProvider : TSignProvider;
     FVaultUrl : string;
     FCertName : string;
@@ -71,7 +71,7 @@ type
     // Credential Manager). Takes precedence over the env var when set.
     FClientSecret : string;
     FSignotaurEndpoint : string;
-    FSignotaurApiKey : string;        // --api-key (literal — discouraged but supported)
+    FSignotaurApiKey : string;        // --api-key (literal - discouraged but supported)
     FSignotaurApiKeyEnv : string;     // --api-key-env (env var name, preferred)
     FSignotaurSubject : string;
     FSignotaurLabel : string;
@@ -121,7 +121,7 @@ class constructor TSignOptions.CreateDefault;
 begin
   FDefault := TSignOptions.Create;
   FDefault.FTimestampUrl := 'http://timestamp.digicert.com';
-  // FDigest left empty on purpose — empty means "auto-select from the cert's
+  // FDigest left empty on purpose - empty means "auto-select from the cert's
   // key type" (RSA -> SHA-256, ECDSA P-384 -> SHA-384, etc). Setting an
   // explicit default would force SHA-256 even for ECDSA P-384 certs whose
   // HSM/PIV middleware only supports SHA-384 (FIPS 186 curve-size match).
@@ -146,7 +146,7 @@ begin
                  '(eg dpm sign Foo.dpkg --thumbprint ...).');
     result := false;
   end;
-  // Path existence is checked at expansion time — the input may be a file,
+  // Path existence is checked at expansion time - the input may be a file,
   // a directory or a wildcard pattern, each with different existence rules.
 
   case FProvider of

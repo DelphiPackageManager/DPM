@@ -26,15 +26,15 @@
 
 unit DPM.Core.Crypto.Provider.Azure;
 
-// Phase 3 §3.3 — Azure Key Vault signing provider.
+// Phase 3 §3.3 - Azure Key Vault signing provider.
 //
 // Three pieces:
-//   1. TAzureAccessTokenService  — AAD client-credentials flow + on-disk
+//   1. TAzureAccessTokenService  - AAD client-credentials flow + on-disk
 //      token cache under %APPDATA%\.dpm\azure-token-cache\.
-//   2. TKeyVaultClient            — thin REST wrapper over the KV data plane:
+//   2. TKeyVaultClient            - thin REST wrapper over the KV data plane:
 //      GET  /certificates/{name}?api-version=7.4
 //      POST /keys/{name}/sign?api-version=7.4
-//   3. TKeyVaultSigningProvider   — ISigningProvider implementation. Downloads
+//   3. TKeyVaultSigningProvider   - ISigningProvider implementation. Downloads
 //      the leaf cert on first use, delegates SignDigest to the REST call.
 //
 // AcquirePrivateKey returns false: KV-stored keys are never exposed to the
@@ -59,7 +59,7 @@ type
   TKeyVaultOptions = record
     VaultUrl      : string;   // e.g. https://vsoft.vault.azure.net
     CertificateName : string; // KV certificate name (the cert + key pair)
-    KeyVersion    : string;   // optional — empty means latest
+    KeyVersion    : string;   // optional - empty means latest
     TenantId      : string;
     ClientId      : string;
     // The CLI reads the secret from an env var rather than the command line.
@@ -272,7 +272,7 @@ begin
     result := (token.AccessToken <> '') and (token.ExpiresAt > 0);
   except
     on Exception do
-      // Corrupt cache — treat as miss; will be overwritten next fetch.
+      // Corrupt cache - treat as miss; will be overwritten next fetch.
       result := false;
   end;
 end;
@@ -559,7 +559,7 @@ end;
 procedure TKeyVaultSigningProvider.SetSigningContext(const fileName : string;
                                                       fileSize : Int64);
 begin
-  // No-op. Key Vault's sign endpoint takes no audit-metadata fields — the
+  // No-op. Key Vault's sign endpoint takes no audit-metadata fields - the
   // KV audit log records the caller's AAD identity + key version, not the
   // file being signed.
 end;

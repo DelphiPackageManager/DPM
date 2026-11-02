@@ -65,7 +65,7 @@ type
 
     property PackageId : string read GetPackageId write SetPackageId;
 
-    // `dpm cache install <file.dpkg>` — when the positional argument is the path
+    // `dpm cache install <file.dpkg>` - when the positional argument is the path
     // to a package file on disk rather than a package id, Validate moves it here
     // (and clears PackageId). The installer extracts this file into the cache and
     // builds it, instead of resolving the id from the configured sources. Empty
@@ -92,7 +92,7 @@ type
     // --force` rebuilds the package even when it is already built. One field - the installer reads the
     // inherited one, so a field of our own here would never reach it.
 
-    // `dpm cache verify` — re-hash every cached package against its manifest
+    // `dpm cache verify` - re-hash every cached package against its manifest
     // and re-run signature verification (plan §1.6, V-34). When set, the
     // PackageId / Compiler / Version checks below are skipped. Kept in sync
     // with Command = Verify by the option registration.
@@ -171,7 +171,7 @@ begin
         result := false;
       end;
 
-    // `dpm cache verify` takes no positional args — short-circuit the
+    // `dpm cache verify` takes no positional args - short-circuit the
     // package-id / compiler / version checks that the other forms require.
     TCacheSubCommand.Verify : ; //nothing else to validate
 

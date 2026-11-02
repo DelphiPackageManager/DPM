@@ -26,7 +26,7 @@
 
 unit DPM.IDE.Trust.Prompt;
 
-// IDE implementation of ITrustPromptStrategy — wraps the modal
+// IDE implementation of ITrustPromptStrategy - wraps the modal
 // TTrustPromptForm. Registered by the IDE plugin in place of the Core
 // non-interactive default.
 
@@ -136,7 +136,7 @@ begin
     summary :=
       Format('You previously installed this package under namespace "%s". The build ' +
              'you''re about to install attests to a different namespace "%s". This ' +
-             'is a hard fail per V-24 — closes the publisher-impersonation door.',
+             'is a hard fail per V-24 - closes the publisher-impersonation door.',
              [context.PreviousNamespace, context.NewNamespace]);
     newDescription := Format('namespace "%s" (sha256:%s)',
       [context.NewNamespace, ShortSpki(context.NewRepoSpkiHex)]);

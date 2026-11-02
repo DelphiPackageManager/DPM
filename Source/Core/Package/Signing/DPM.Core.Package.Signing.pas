@@ -73,7 +73,7 @@ type
     FArchive : IArchiveValidator;
     FReceipt : IReceiptService;
     FTrustPolicy : ITrustPolicyService;
-    // P3 §3.2 — current-call runtime flags. Set by the overloaded entry
+    // P3 §3.2 - current-call runtime flags. Set by the overloaded entry
     // point before delegating to the shared VerifyPackage path so the
     // inner VerifyOneSignature can read e.g. Offline without changing every
     // intermediate signature.
@@ -87,7 +87,7 @@ type
     function ReadSignatureBlobs(const archivePath : string;
                                 out blobs : IList<TPair<string, TBytes>>) : boolean;
     // Filename-only scan of the signatures/ folder. No entry contents are
-    // read — just enumerates the central directory and returns the next
+    // read - just enumerates the central directory and returns the next
     // free author-N index. Raises on read failure so we never silently
     // collide on author-1.p7s.
     function NextAuthorSignatureIndex(const archivePath : string) : integer;
@@ -114,7 +114,7 @@ type
                                        var repoSigInfo : TSignatureInfo);
     // Inverse of EnforceAuthorSigBinding. Attestation declares no verified
     // author (authorMode = never_author_signed / author_acknowledged_unsigned)
-    // — but if the archive carries any signatures/author-*.p7s blob, the
+    // - but if the archive carries any signatures/author-*.p7s blob, the
     // upload's contents disagree with what the gallery signed. Either an
     // attacker swapped a verified-author blob for an unverified one (so the
     // gallery saw no verified signer) or the gallery's attestation generator
@@ -126,12 +126,12 @@ type
     // Strip a single OCTET STRING (tag 04) or UTF8String (tag 0C) wrapper
     // from `value`, returning its content bytes. If the bytes don't look
     // like a recognised wrapper (or claim a length larger than available)
-    // the input is returned unchanged — caller can still attempt to parse,
+    // the input is returned unchanged - caller can still attempt to parse,
     // just from an unexpected shape.
     function UnwrapOctetString(const value : TBytes) : TBytes;
     // Tolerant UTF-8 → string conversion. Falls back to byte-by-byte ASCII
     // when TEncoding.UTF8.GetString raises (strict-UTF8 configurations).
-    // Never raises — the caller for attestation parsing relies on us
+    // Never raises - the caller for attestation parsing relies on us
     // returning *something* parseable so the KV walker can spot a malformed
     // payload and the binding-enforcement security check can still run.
     function Utf8BytesToStringSafe(const bytes : TBytes) : string;
@@ -165,7 +165,7 @@ const
   //
   // We were assigned on 1.3.6.1.4.1.65863
   // The constants below MUST NEVER
-  // be removed — old packages embed them literally in their signed
+  // be removed - old packages embed them literally in their signed
   // attributes and will keep verifying via the alias path forever.
   //
 
@@ -234,7 +234,7 @@ begin
     begin
       if SameText(zip.FileName[i], cManifestFileName) then
       begin
-        // Use the RTL TBytes overload — it reads UncompressedSize bytes from the
+        // Use the RTL TBytes overload - it reads UncompressedSize bytes from the
         // entry stream's correct position. See ReadSignatureBlobs for why the
         // stream overload + ms.Size/ms.Position is unusable on Delphi 10.2.
         zip.Read(i, bytes);
@@ -269,7 +269,7 @@ begin
       if StartsText(cSignatureFolder, StringReplace(name, '\', '/', [rfReplaceAll])) then
         Continue;
 
-      // RTL TBytes overload — reads the entry's bytes from the correct position.
+      // RTL TBytes overload - reads the entry's bytes from the correct position.
       zip.Read(i, bytes);
       // Detect by content, not extension, so a renamed binary is still caught.
       if TPEUtils.IsPE(bytes) and (not TPEUtils.HasAuthenticodeSignature(bytes)) then
@@ -317,7 +317,7 @@ begin
         Continue;
       if (Length(name) > 0) and (name[Length(name)] = '/') then
         Continue;   // directory placeholder
-      // Use the RTL TBytes overload — it reads UncompressedSize bytes from the
+      // Use the RTL TBytes overload - it reads UncompressedSize bytes from the
       // entry stream's correct position. The stream overload + ms.Size/Position
       // is unusable on Delphi 10.2: for a STORED entry (a .p7s is incompressible
       // so it is stored, not deflated) ms.Size is reported as bytes-to-end-of-
@@ -345,7 +345,7 @@ begin
   highest := 0;
   zip := TZipFile.Create;
   try
-    // No try/except — a read failure here MUST surface, not be swallowed
+    // No try/except - a read failure here MUST surface, not be swallowed
     // into nextIndex=1 and append a duplicate author-1.p7s.
     zip.Open(archivePath, zmRead);
     for i := 0 to zip.FileCount - 1 do
@@ -462,9 +462,9 @@ begin
   // sporadic (~0.4%) signing failures where the produced CMS is structurally
   // valid and the messageDigest attribute correctly equals SHA(manifest), but
   // the signature value itself doesn't verify against the signer cert's
-  // public key. Root cause could be on either side — a client-side digest
+  // public key. Root cause could be on either side - a client-side digest
   // corruption (TBytes lifetime, HTTP-body truncation, etc.) or a remote
-  // signing service returning a bad signature — and we can't distinguish
+  // signing service returning a bad signature - and we can't distinguish
   // them after the fact from the artifact alone. What we CAN do is refuse
   // to ship the bad package: it would silently fail verification on every
   // downstream consumer otherwise.
@@ -500,8 +500,8 @@ begin
   // Imprint covers the signer's encryptedDigest, NOT the full CMS. The
   // unsigned attribute we attach below changes the CMS bytes but doesn't
   // touch encryptedDigest, so verify sees the same bytes we signed over.
-  // ExtractEncryptedDigest is the minimal Win32 decode — no signer/cert/
-  // attribute traversal — to avoid AV exits on hand-assembled CMS (remote
+  // ExtractEncryptedDigest is the minimal Win32 decode - no signer/cert/
+  // attribute traversal - to avoid AV exits on hand-assembled CMS (remote
   // provider path).
   imprintBytes := FCms.ExtractEncryptedDigest(cmsDer);
   FLogger.Verbose(Format('  Timestamp imprint covers encryptedDigest (%d bytes)', [Length(imprintBytes)]));
@@ -573,7 +573,7 @@ begin
       archivePaths[normalised] := i;
     end;
 
-    // Walk manifest entries — each must be in the archive with matching hash + size.
+    // Walk manifest entries - each must be in the archive with matching hash + size.
     for j := 0 to High(manifest.Files) do
     begin
       entry := manifest.Files[j];
@@ -589,7 +589,7 @@ begin
         raise EPackageSigning.CreateFmt('Size mismatch for "%s": manifest=%d archive=%d',
           [entry.Path, entry.Size, zip.FileInfo[found].UncompressedSize]);
 
-      // RTL TBytes overload — reads from the entry's correct position. See
+      // RTL TBytes overload - reads from the entry's correct position. See
       // ReadSignatureBlobs: the stream overload + ms.Size/ms.Position corrupts
       // STORED entries on Delphi 10.2 (wrong Size, and Position:=0 seeks to the
       // archive start), so a stored file would otherwise fail integrity there.
@@ -677,7 +677,7 @@ begin
         end;
       end;
     except
-      // Decode itself failed — leave signer fields blank; the FailureReason
+      // Decode itself failed - leave signer fields blank; the FailureReason
       // already tells the user the signature is invalid.
       on Exception do ;
     end;
@@ -687,7 +687,7 @@ begin
   decoded := FCms.Decode(der);
 
   // Find the role attribute. Default to author if absent (back-compat for
-  // legacy author-only blobs that pre-date the role attribute — Phase 1
+  // legacy author-only blobs that pre-date the role attribute - Phase 1
   // tightens this to require the attribute once Phase 1 ships).
   //
   // Producers vary on whether they DER-wrap the attribute value in an
@@ -736,13 +736,13 @@ begin
   if info.FailureReason <> '' then
     exit;
 
-  // V-17: RFC3161 timestamp — establish effective signing time
+  // V-17: RFC3161 timestamp - establish effective signing time
   if not decoded.FindUnsignedAttribute(szOID_RFC3161_counterSign, tsToken) then
   begin
     info.FailureReason := 'signature has no RFC3161 timestamp';
     exit;
   end;
-  // The imprint covers the signer's encryptedDigest — the same bytes we
+  // The imprint covers the signer's encryptedDigest - the same bytes we
   // signed at pack time. Adding the unsigned attribute does not change
   // encryptedDigest, so the round-trip matches.
   if not FTimestamper.Verify(tsToken, decoded.EncryptedDigest, not FActiveFlags.Offline, tsCheck) then
@@ -762,7 +762,7 @@ begin
     info.EffectiveSigningTime := tsCheck.SigningTime;
 
   // Repository signatures are authenticated by SPKI pinning against the
-  // trust set — NOT chain validation. Per docs/package-signing.md
+  // trust set - NOT chain validation. Per docs/package-signing.md
   // §Trust Bootstrapping: repository certs are essentially self-issued and
   // ship with the client as built-in SPKI pins. The CMS verify above plus
   // the RepositoryTrusted(SPKI) check that happens after VerifyOneSignature
@@ -772,7 +772,7 @@ begin
   // has no public-CA parent.
   if info.Role = srRepository then
   begin
-    info.ChainTrusted := false;          // not applicable — SPKI-pinned, not chained
+    info.ChainTrusted := false;          // not applicable - SPKI-pinned, not chained
     info.Revocation := rsNotChecked;
     info.CurrentRevocationReason := rrNotApplicable;
     info.Valid := true;
@@ -780,7 +780,7 @@ begin
     exit;
   end;
 
-  // V-15 / V-16 chain build — gather embedded certs as intermediates and
+  // V-15 / V-16 chain build - gather embedded certs as intermediates and
   // build to a trusted root. Author signatures only.
   embedded := decoded.EmbeddedCertificates;
   SetLength(intermediates, 0);
@@ -799,7 +799,7 @@ begin
   // revocation checks enabled. A revocation that post-dates the signing
   // timestamp does NOT invalidate the signature (the cert was good when the
   // signature was made). A revocation effective at signing time still fails.
-  // P3 §3.2 — when the caller passed --offline, ask the chain engine to
+  // P3 §3.2 - when the caller passed --offline, ask the chain engine to
   // skip CRL/OCSP fetches. The engine still uses its on-disk cache, so a
   // recently fetched response is consulted. Unreachable becomes rsUnknown
   // rather than failing the verify.
@@ -825,13 +825,13 @@ begin
   info.UntrustedRoot := untrustedRoot;
   info.Revocation := chain.RevocationStatus;
 
-  // V-26 follow-up — second chain build at "now" (no pTime) to detect a
+  // V-26 follow-up - second chain build at "now" (no pTime) to detect a
   // post-signing keyCompromise revocation. The timestamp-aware build above
   // uses the CRL valid at signing time, which won't carry a revocation
   // published later. Without this second pass we'd miss keyCompromise
   // disclosures that arrive after the package shipped.
   //
-  // Skip in offline mode — we'd just get the same (possibly stale) cached
+  // Skip in offline mode - we'd just get the same (possibly stale) cached
   // CRL as the first pass.
   info.CurrentRevocationReason := rrNotApplicable;
   if not FActiveFlags.Offline then
@@ -861,7 +861,7 @@ const
   // Tags producers reasonably use to wrap a string-shaped AttributeValue.
   // CMS AttributeValue is ANY, so the producer picks. OCTET STRING (04) is
   // what the DPM client emits; .NET / Node CMS libraries often pick
-  // UTF8String (0C) for string payloads — both wrap the same way, and we
+  // UTF8String (0C) for string payloads - both wrap the same way, and we
   // want to unwrap either before handing the bytes to a UTF-8 decoder.
   // Other string-ish tags (PrintableString 13, IA5String 16, …) get added
   // here if we ever see them in the wild.
@@ -881,13 +881,13 @@ begin
 
   if value[1] < $80 then
   begin
-    // Short form — length fits in one byte.
+    // Short form - length fits in one byte.
     contentLen := value[1];
     contentStart := 2;
   end
   else
   begin
-    // Long form — value[1] = 0x80 | <number-of-length-bytes>.
+    // Long form - value[1] = 0x80 | <number-of-length-bytes>.
     // Max length we care about: a few KB, so 1..4 length bytes is plenty.
     lenOf := value[1] and $7F;
     if (lenOf = 0) or (lenOf > 4) or (Length(value) < 2 + lenOf) then
@@ -899,7 +899,7 @@ begin
   end;
 
   if contentLen > Length(value) - contentStart then
-    exit;     // declared length overruns the buffer — leave as-is
+    exit;     // declared length overruns the buffer - leave as-is
 
   SetLength(result, contentLen);
   if contentLen > 0 then
@@ -984,11 +984,11 @@ begin
   // schema without breaking older verifiers).
   //
   // FindSignedAttribute returns the raw attribute-value bytes Windows hands
-  // back from CryptMsgGetParam — the DER-wrapped form. UnwrapOctetString
+  // back from CryptMsgGetParam - the DER-wrapped form. UnwrapOctetString
   // strips a OCTET STRING (04) or UTF8String (0C) wrapper if present so we
   // can hand the inner JSON bytes to the decoder.
   attrBytes := UnwrapOctetString(attrBytes);
-  // Tolerant decode — strict UTF-8 RTL builds raise on invalid sequences,
+  // Tolerant decode - strict UTF-8 RTL builds raise on invalid sequences,
   // which would otherwise tunnel out and (before the hard-fail wiring in
   // VerifyPackage) silently skip the binding check.
   text := Utf8BytesToStringSafe(attrBytes);
@@ -1008,7 +1008,7 @@ begin
 
     authorMode := doc.S['authorMode'];
     namespace := doc.S['namespace'];
-    // TJsonObject.S returns '' for both a missing key and a JSON null —
+    // TJsonObject.S returns '' for both a missing key and a JSON null -
     // both legitimately mean "no verified author signer", so we don't
     // distinguish.
     authorSpki := doc.S['authorSpki'];
@@ -1074,7 +1074,7 @@ var
 begin
   // Empty / absent binding attribute is a hard failure when the attestation
   // declares a signed author. Without the binding an attacker could strip
-  // or swap the author signature without detection — the repo signature
+  // or swap the author signature without detection - the repo signature
   // covers the manifest, not the author sig blob. Gallery is expected to
   // emit dpmVerifiedAuthorSigHash (OID 1.3.6.1.4.1.65863.1.3) for every
   // attested author signature.
@@ -1084,7 +1084,7 @@ begin
     repoSigInfo.FailureReason :=
       'repository attestation declares a signed-author SPKI but the ' +
       'dpmVerifiedAuthorSigHash binding attribute (OID ' +
-      string(cOidDpmVerifiedAuthorSigHash) + ') is missing — gallery did ' +
+      string(cOidDpmVerifiedAuthorSigHash) + ') is missing - gallery did ' +
       'not bind the repository signature to any author signature, so the ' +
       'author<->repo link cannot be verified.';
     exit;
@@ -1132,7 +1132,7 @@ begin
   // this namespace) must be the signer of at least one of the bound author
   // sigs we just matched. Co-signers / co-publishers may also be bound and
   // are vouched for by the gallery, but the primary SPKI anchors the
-  // namespace identity — without that link, the attestation's authorSpki
+  // namespace identity - without that link, the attestation's authorSpki
   // field is unsupported by the actual blobs in the package.
   primaryMatched := false;
   for k := 0 to High(matchedSpkis) do
@@ -1146,7 +1146,7 @@ begin
     repoSigInfo.Valid := false;
     repoSigInfo.FailureReason := Format(
       'repository attestation declares primary author SPKI %s... but no ' +
-      'bound author signature in the archive is signed by that key — the ' +
+      'bound author signature in the archive is signed by that key - the ' +
       'author signature was swapped for one from a different certificate.',
       [Copy(repoSigInfo.Attestation.AuthorSpkiHex, 1, 16)]);
     exit;
@@ -1180,7 +1180,7 @@ begin
   repoSigInfo.Valid := false;
   repoSigInfo.FailureReason := Format(
     'repository attestation declares no verified author signer (authorMode=%s) ' +
-    'but the archive contains %d author signature blob(s) — the archive ' +
+    'but the archive contains %d author signature blob(s) - the archive ' +
     'contents do not match what the gallery attested at publish time. An ' +
     'author signature was added, swapped, or the gallery''s attestation is ' +
     'out of date.',
@@ -1294,7 +1294,7 @@ begin
       sigInfo.RepositoryTrusted := sigInfo.Valid and FTrustPolicy.RepositoryTrusted(policy, sigInfo.SignerSpkiHex);
       // V-21: only read the attestation off a trusted repository signature.
       // An attestation present on an untrusted repo signature is ignored
-      // entirely — never read, never displayed.
+      // entirely - never read, never displayed.
       if sigInfo.Valid and sigInfo.RepositoryTrusted then
       begin
         try
@@ -1302,7 +1302,7 @@ begin
         except
           on e : Exception do
           begin
-            // Hard fail — a parse exception on a trusted repo sig MUST NOT
+            // Hard fail - a parse exception on a trusted repo sig MUST NOT
             // bypass the binding check. Silently ignoring would let an
             // attacker neuter author<->repo binding by corrupting the
             // attestation: parser raises -> Attestation.Present stays
@@ -1310,7 +1310,7 @@ begin
             // sig goes undetected.
             sigInfo.Valid := false;
             sigInfo.FailureReason := Format(
-              'repository attestation could not be parsed (%s: %s) — ' +
+              'repository attestation could not be parsed (%s: %s) - ' +
               'cannot verify the gallery''s claim about who signed this ' +
               'package',
               [e.ClassName, e.Message]);
@@ -1325,13 +1325,13 @@ begin
           sigInfo.Valid := false;
           sigInfo.FailureReason :=
             'repository signature has no dpmRepositoryAttestation attribute ' +
-            '— gallery did not declare the registered publisher for this ' +
+            '- gallery did not declare the registered publisher for this ' +
             'package, so the author<->repo binding cannot be verified';
         end;
       end;
     end;
 
-    // V-26 follow-up — retroactive invalidation on keyCompromise. The
+    // V-26 follow-up - retroactive invalidation on keyCompromise. The
     // second-pass build inside VerifyOneSignature surfaces the current
     // CRL reason; if it's keyCompromise we treat the signature as invalid
     // unless the administrator has explicitly accepted the residual risk.
@@ -1340,7 +1340,7 @@ begin
     begin
       sigInfo.Valid := false;
       sigInfo.FailureReason :=
-        'certificate revoked for keyCompromise — signature retroactively invalid';
+        'certificate revoked for keyCompromise - signature retroactively invalid';
     end;
 
     result.Signatures[i] := sigInfo;

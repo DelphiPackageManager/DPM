@@ -129,7 +129,7 @@ type
     function GetReleaseNotes : string;
     function GetReadMe : string;
     function GetFrameworks : TArray<TDPMUIFrameworkType>;
-    ///<summary>Populates this package's metadata fields from the spec's metadata — the single place
+    ///<summary>Populates this package's metadata fields from the spec's metadata - the single place
     /// where ISpecMetaData → IPackageMetadata field-copying lives. Allocates FAuthors/FTags first so
     /// it is also safe to call on an instance created via the json constructor.</summary>
     procedure AssignFromSpecMetaData(const source : ISpecMetaData);

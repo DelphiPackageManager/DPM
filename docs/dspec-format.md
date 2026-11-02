@@ -340,7 +340,7 @@ design:
 
 Commercial libraries are often distributed as compiled binaries with no `.dpk`/`.dproj` to
 build. Point `project` straight at the `.bpl` the package ships and DPM treats it as already
-built — no dproj patching, no MSBuild — and loads it into the IDE as-is:
+built - no dproj patching, no MSBuild - and loads it into the IDE as-is:
 
 ```yaml
 templates:
@@ -392,21 +392,21 @@ At install time DPM verifies every prebuilt entry regardless of which platform i
 installed for; at load time the IDE picks the single entry matching its own bitness and ignores
 the other.
 
-For a *compiled* design entry none of this applies — DPM builds the bpl once per platform into
+For a *compiled* design entry none of this applies - DPM builds the bpl once per platform into
 `bpl\{platform}` and `platforms` is just a filter, so one entry serves both IDEs.
 
 ##### Other rules for prebuilt entries
 
-- The `.bpl` must be packed by a source entry, same as any build/design project — `dpm pack`
+- The `.bpl` must be packed by a source entry, same as any build/design project - `dpm pack`
   fails the package otherwise. `install` errors if the binary isn't in the extracted package.
 - `libPrefix`/`libSuffix` are ignored. They exist to find whatever filename Delphi emitted for a
   project DPM compiled; here the path *is* the filename.
 - The folder holding the `.bpl` is added to the IDE search path, so sibling runtime bpls the
-  design package links against resolve — keep them together.
+  design package links against resolve - keep them together.
 
 ### Package Definitions
 
-Some libraries ship only `.pas` source and no Delphi package projects (`.dpk`/`.dproj`) —
+Some libraries ship only `.pas` source and no Delphi package projects (`.dpk`/`.dproj`) -
 this is common for `packageKind: git` source libraries. A `package definitions` section lets
 you describe the package projects DPM should **generate** for such a library. On install, DPM
 renders the `.dpk`/`.dproj` into the package cache and the matching `build`/`design` entry
@@ -486,7 +486,7 @@ Values are expanded in two stages:
 
 > **`$packageDir$` is exclusive to `environmentVariables` values.** They are the only values DPM
 > processes at install time, so `$packageDir$` is only meaningful here. Using it anywhere else in the
-> dspec (a `src`, `project`, `dest`, regular `variables:` value, etc.) is an **error at pack time** —
+> dspec (a `src`, `project`, `dest`, regular `variables:` value, etc.) is an **error at pack time** -
 > those fields are fully resolved when the package is built and have no access to the consumer's
 > cache path.
 
@@ -596,7 +596,7 @@ These are resolved automatically for the target compiler when packing (and when 
 | `$compiler$` / `$target$` | `delphi10.4` | `delphixe2` | Full prefixed version string |
 | `$compilernoprefix$` | `10.4` | `XE2` | Version without the `delphi` prefix |
 | `$compilernopoint$` | `delphi10` | `delphixe2` | Prefixed version with the point removed |
-| `$compilershortversion$` | `104` | `XE2` | No prefix, no point — e.g. `100`, `104`, `110`, `130`. Pairs with `D`-prefixed folder schemes like `D104`/`D110` |
+| `$compilershortversion$` | `104` | `XE2` | No prefix, no point - e.g. `100`, `104`, `110`, `130`. Pairs with `D`-prefixed folder schemes like `D104`/`D110` |
 | `$compilermajornoprefix$` | `10` | `XE` | Major version only, no prefix |
 | `$compilercodename$` | `Sydney` | (empty) | Marketing code name (10.0+ only) |
 | `$compilerwithcodename$` | `delphi10.4 Sydney` | `delphixe2` | Version plus code name |
@@ -653,7 +653,7 @@ metadata:
 ### Git Package
 
 Git packages reference a Git repository. The set of resolvable versions is **not** declared
-in the dspec — DPM derives them from the repository's **git tags** at resolve time.
+in the dspec - DPM derives them from the repository's **git tags** at resolve time.
 
 ```yaml
 packageKind: "git"
@@ -668,7 +668,7 @@ metadata:
 
 > **Note:** For `packageKind: git`, the `version` field is optional (the dspec version is
 > informational and is set per-tag during resolution). For the default `packageKind: dpm`,
-> `version` is required. The commit is carried by `repositoryCommit` — there is no per-version
+> `version` is required. The commit is carried by `repositoryCommit` - there is no per-version
 > `commit` array.
 
 ---

@@ -107,7 +107,7 @@ begin
  container.RegisterType<ILogger, TDPMConsoleLogger>.AsSingleton();
 
  //Override the non-interactive default registered by InitCore with a stdin-aware
- //prompt — CLI commands can ask the user about author-signing downgrades.
+ //prompt - CLI commands can ask the user about author-signing downgrades.
  container.RegisterType<ITrustPromptStrategy,TConsoleTrustPromptStrategy>;
 
  container.RegisterType<ICommandHandler,TCacheCommand>('command.cache');

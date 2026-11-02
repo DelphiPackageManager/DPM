@@ -77,7 +77,7 @@ begin
   FStdOut := GetStdHandle(STD_OUTPUT_HANDLE);
   // GetStdHandle returns 0 when no stdout is attached (e.g. spawned with no
   // inherited handles and no console) and INVALID_HANDLE_VALUE on error.
-  // Either case means we have nowhere to write — drop output rather than
+  // Either case means we have nowhere to write - drop output rather than
   // letting the Pascal RTL raise EInOutError(6) on every write.
   FNoStdOut := (FStdOut = 0) or (FStdOut = INVALID_HANDLE_VALUE);
 
@@ -236,7 +236,7 @@ var
   bytesWritten : Cardinal;
 begin
   // When stdout is a pipe/file (e.g. captured by FinalBuilder) we must avoid
-  // the Pascal RTL Output text file — it raises EInOutError(6) if the handle
+  // the Pascal RTL Output text file - it raises EInOutError(6) if the handle
   // isn't usable. WriteFile fails silently on a bad handle, which is what we
   // want for a logger.
   if FNoStdOut then

@@ -1,6 +1,6 @@
 ﻿unit DPM.Core.Tests.Trust;
 
-// Phase 1 §1.12 — trust state (TOFU author no-downgrade ratchet) and
+// Phase 1 §1.12 - trust state (TOFU author no-downgrade ratchet) and
 // policy-fingerprint stability.
 
 interface
@@ -43,7 +43,7 @@ type
     procedure FingerprintIsLowercaseHex;
   end;
 
-  // P3 §3.4 — emergency revocation channel. Verifies the policy treats
+  // P3 §3.4 - emergency revocation channel. Verifies the policy treats
   // revoked SPKIs as untrusted even when they're also pinned by the user.
   [TestFixture]
   TTrustPolicyRevokeTests = class
@@ -73,7 +73,7 @@ type
     [Test] procedure RemoveAuthor_DropsExistingEntry_AndPersists;
     [Test] procedure RemoveAuthor_OnUnknownPackage_IsNoOp;
 
-    // P2 — repository ratchet
+    // P2 - repository ratchet
     [Test] procedure RecordRepository_RoundTrips_SpkiAndNamespace;
     [Test] procedure RecordRepository_OnExistingAuthorEntry_BothCoexist;
     [Test] procedure RecordRepository_Persists_AcrossInstances;
@@ -224,7 +224,7 @@ end;
 // trust set + null config manager isn't possible here (it loads from disk),
 // so we reach into the projection function indirectly through a hash compare.
 //
-// Strategy: use a lightweight stand-in — build a TTrustPolicy record and
+// Strategy: use a lightweight stand-in - build a TTrustPolicy record and
 // fingerprint it via SHA-256 over the same canonical projection. The test
 // asserts properties of the *projection*, not the service.
 
@@ -569,7 +569,7 @@ begin
   path := TempFile;
   try
     svc := NewTrustState(path);
-    // BlockPermanently must create a fresh entry if none exists yet —
+    // BlockPermanently must create a fresh entry if none exists yet -
     // this happens when the user picks "Always block" on a TOFU first-install.
     svc.BlockPermanently('Brand.New.Pkg');
     Assert.IsTrue(svc.TryGetAuthor('Brand.New.Pkg', loaded));
@@ -598,7 +598,7 @@ begin
     svc.BlockPermanently('Existing.Pkg');
     Assert.IsTrue(svc.TryGetAuthor('Existing.Pkg', loaded));
     Assert.IsTrue(loaded.BlockedPermanently);
-    // Other fields preserved — the block doesn't erase what we knew.
+    // Other fields preserved - the block doesn't erase what we knew.
     Assert.AreEqual('feedbeef', loaded.LastAuthorSpkiHex);
     Assert.IsTrue(loaded.LastSeenAuthorSigned);
   finally
@@ -814,7 +814,7 @@ end;
 
 { TTrustPolicyRevokeTests }
 //
-// RepositoryTrusted only needs the trust set + hashing dependencies — it
+// RepositoryTrusted only needs the trust set + hashing dependencies - it
 // never touches the config manager. We give it a stub config manager that
 // returns nil for everything, a TBuiltInTrustSet primed via YAML, and the
 // real hashing service.
@@ -892,7 +892,7 @@ var
   policy : TTrustPolicy;
 begin
   // Not pinned by user either. Revoked-only is still untrusted, but that's
-  // the same result as Phase 1 — what matters is the next test.
+  // the same result as Phase 1 - what matters is the next test.
   svc := MakeService(cYaml);
   policy := MakePolicyWithPin('');
   Assert.IsFalse(svc.RepositoryTrusted(policy, 'sha256:badbad'));

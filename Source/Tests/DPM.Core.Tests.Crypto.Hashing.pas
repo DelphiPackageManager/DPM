@@ -1,6 +1,6 @@
 ﻿unit DPM.Core.Tests.Crypto.Hashing;
 
-// Phase 1 test plan §1.12 — hashing known-answer + algorithm allowlist.
+// Phase 1 test plan §1.12 - hashing known-answer + algorithm allowlist.
 
 interface
 
@@ -200,7 +200,7 @@ begin
       hasher : IHasher;
     begin
       hasher := NewHashing.CreateHasher(haUnknown);
-      // touch to silence H2077 in compilers that warn — also keeps the
+      // touch to silence H2077 in compilers that warn - also keeps the
       // lambda from being optimised away.
       if hasher <> nil then hasher.Finish;
     end,
@@ -259,13 +259,13 @@ end;
 
 procedure THashingTests.HashString_UsesUTF8Encoding;
 const
-  // SHA-256("é") in UTF-8 (0xC3 0xA9) — known answer
+  // SHA-256("é") in UTF-8 (0xC3 0xA9) - known answer
   cExpected = 'b25c6f87f1c6a0e9b8b86ad9c2ee75e4ed1c726d6dac0e2cb18f1e2c3a06d4cf';
 var
   hash : TBytes;
 begin
   // Cross-check that the hash is computed over the UTF-8 bytes, not UTF-16.
-  // (We don't pin the exact constant — instead verify equivalence to the
+  // (We don't pin the exact constant - instead verify equivalence to the
   // explicit byte form, which is the *property* we care about.)
   hash := NewHashing.HashString(#$00E9, haSha256);
   Assert.IsTrue(BytesEqual(

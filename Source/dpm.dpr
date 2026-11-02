@@ -322,7 +322,7 @@ begin
       on E: Exception do
       begin
         System.ExitCode := Ord(TExitCode.UnhandledException);
-        // Swallow any I/O failure from the WriteLn itself — when launched
+        // Swallow any I/O failure from the WriteLn itself - when launched
         // without a usable stdout (e.g. from FinalBuilder's Execute Program)
         // the Pascal RTL would otherwise raise EInOutError(6) here and that
         // becomes the only thing the parent process sees.

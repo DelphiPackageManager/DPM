@@ -43,7 +43,7 @@ uses
 
 type
   THashAlgorithm = (
-    haUnknown,    // sentinel — never accepted
+    haUnknown,    // sentinel - never accepted
     haSha256,
     haSha384,
     haSha512
@@ -57,7 +57,7 @@ type
     // V-16: CMS digest algorithms allowed in author / repository signatures
     class function CmsDigestAllowed(algorithm : THashAlgorithm) : boolean; static;
 
-    // V-16: timestamp digest algorithms — currently SHA-256 only (the dominant
+    // V-16: timestamp digest algorithms - currently SHA-256 only (the dominant
     // TSA response algorithm; broaden when justified)
     class function TimestampDigestAllowed(algorithm : THashAlgorithm) : boolean; static;
 
@@ -121,7 +121,7 @@ const
   cEcdsaSha256 = '1.2.840.10045.4.3.2';
   cEcdsaSha384 = '1.2.840.10045.4.3.3';
   cEcdsaSha512 = '1.2.840.10045.4.3.4';
-  // Bare RSA — discouraged but allowed for legacy CAs; the hash declared on
+  // Bare RSA - discouraged but allowed for legacy CAs; the hash declared on
   // the signed-attribute side still determines actual digest strength.
   cRsa = '1.2.840.113549.1.1.1';
   // Bare id-ecPublicKey - what CryptoAPI writes for some ECDSA keys, the ECDSA

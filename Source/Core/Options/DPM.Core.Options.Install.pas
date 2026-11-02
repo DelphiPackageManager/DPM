@@ -51,7 +51,7 @@ type
   ///  IDE path (from the package manager UI):
   ///    PackageId, Version (TSearchOptions.Version, already-parsed) or AddPackage, Projects (explicit
   ///    list of .dproj files from the project grid), Platforms = [], IsUpgrade, CompilerVersion
-  ///    ProjectPath is left blank — the IDE uses the Projects array instead.
+  ///    ProjectPath is left blank - the IDE uses the Projects array instead.
   ///
   ///  Either ProjectPath or Projects must be set; Validate rejects the case where both are set
   ///  (ambiguous) or neither is set.
@@ -319,7 +319,7 @@ begin
   else if (FProjectPath <> '') and (Length(FProjects) > 0) then
   begin
     //ProjectPath is the CLI's "point at a directory or .dproj"; Projects is the IDE's "here is
-    //the explicit list of .dproj files". Both set at once is ambiguous — reject it.
+    //the explicit list of .dproj files". Both set at once is ambiguous - reject it.
     logger.Error(TErrorCode.E0003_InternalError, 'ProjectPath and Projects cannot both be set - use one or the other (ProjectPath is for the CLI, Projects for the IDE).');
     result := false;
   end;

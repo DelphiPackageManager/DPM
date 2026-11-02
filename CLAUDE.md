@@ -31,7 +31,7 @@ ISpec* - Package specification (YAML-based .dspec files)
 
 ### Resolution / installation data flow
 
-Three types carry "a resolved package" through the pipeline. They overlap on purpose — each
+Three types carry "a resolved package" through the pipeline. They overlap on purpose - each
 serves a different phase and has a different shape:
 
 | Type | Phase | Shape | Mutability | Used for |
@@ -52,18 +52,18 @@ Clone semantics:
 `DoRestoreProjectForPlatform` picks one of two paths depending on whether the project's existing
 graph is still consistent with each package's declared dependencies:
 
-1. **Fast path** (`TryValidateRestoreGraph`) — walks the dproj's recorded graph and, for every
+1. **Fast path** (`TryValidateRestoreGraph`) - walks the dproj's recorded graph and, for every
    declared dependency, verifies a child exists at a version within the declared range. If every
    transient is present and in range, the graph is good and we skip the resolver entirely. The
    resolved-packages list is populated in DFS order (deps before dependers) from the graph itself.
 
-2. **Slow path** (`RestoreUsingInstallResolver`) — entered when the fast path detects a missing
+2. **Slow path** (`RestoreUsingInstallResolver`) - entered when the fast path detects a missing
    transient or out-of-range version. Builds a fresh root carrying only the top-level references
-   (`BuildTopLevelOnlyGraph` — transients stripped) and calls `ResolveForInstall` for each top-level
+   (`BuildTopLevelOnlyGraph` - transients stripped) and calls `ResolveForInstall` for each top-level
    in turn, accumulating the output so shared transients are reused across iterations rather than
    being double-resolved.
 
-There is only one "resolve" entry point on `IDependencyResolver` — `ResolveForInstall`. A previous
+There is only one "resolve" entry point on `IDependencyResolver` - `ResolveForInstall`. A previous
 `ResolveForRestore` method existed but was never working (the context filtered out its requirements)
 and has been removed; both paths above now go through `ResolveForInstall`.
 

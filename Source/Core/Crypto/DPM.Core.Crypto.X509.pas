@@ -248,7 +248,7 @@ var
   inQuotes : boolean;
   c : Char;
 begin
-  // CERT_SIMPLE_NAME_STR may already give us the CN — fall back to a manual
+  // CERT_SIMPLE_NAME_STR may already give us the CN - fall back to a manual
   // sweep through the DN for cases where it does not.
   result := '';
   startPos := Pos(cCnPrefix, dn);
@@ -338,7 +338,7 @@ begin
   encoded := nil;
   encodedSize := 0;
 
-  // Re-encode the SubjectPublicKeyInfo using the OS — never parse ASN.1 by
+  // Re-encode the SubjectPublicKeyInfo using the OS - never parse ASN.1 by
   // hand. The CRYPT_ENCODE_ALLOC_FLAG makes CryptEncodeObjectEx allocate
   // the output buffer; we free it with LocalFree.
   if not CryptEncodeObjectEx(
@@ -487,7 +487,7 @@ var
     // Raw Pointer (NOT TBytes). CryptEncodeObjectEx with CRYPT_ENCODE_ALLOC_FLAG
     // writes back a LocalAlloc'd pointer; using a Delphi-managed TBytes here
     // makes the RTL read/write Delphi dynamic-array header bytes (refcount,
-    // length) from inside the LocalAlloc heap block — that corrupts the heap
+    // length) from inside the LocalAlloc heap block - that corrupts the heap
     // and crashes a later allocator with STATUS_HEAP_CORRUPTION (c0000374).
     expectedBuf : Pointer;
     expectedLen : DWORD;
@@ -530,7 +530,7 @@ begin
   // 186 requires digest size = curve size).
   result := haSha256;
   if PublicKeyType <> cktEcdsa then
-    exit;     // RSA or unknown — SHA-256 default stands
+    exit;     // RSA or unknown - SHA-256 default stands
 
   info := GetCertInfo;
   if info = nil then
@@ -736,7 +736,7 @@ begin
   revInfo := leafElement.pRevocationInfo;
   if (revInfo = nil) or (revInfo.pCrlInfo = nil) then
   begin
-    // Revocation came back as revoked but we have no CRL detail to inspect —
+    // Revocation came back as revoked but we have no CRL detail to inspect -
     // e.g. revoked via an OCSP responder that didn't expose the reason.
     FRevocationReason := rrUnknown;
     exit;
@@ -791,7 +791,7 @@ begin
   end;
 
   // No reason extension on the CRL entry. RFC 5280 treats this as
-  // "unspecified" rather than "unknown" — the cert is revoked, just without
+  // "unspecified" rather than "unknown" - the cert is revoked, just without
   // a stated reason.
   FRevocationReason := rrUnspecified;
 end;
@@ -850,7 +850,7 @@ begin
 
   // V-26: when asOfTime is set, evaluate the chain *as of* the signing
   // timestamp. A revocation that post-dates asOfTime does not fail the
-  // chain — the signature was valid when it was made.
+  // chain - the signature was valid when it was made.
   if asOfTime > 0 then
   begin
     filetime := UtcDateTimeToFileTime(asOfTime);
@@ -874,7 +874,7 @@ begin
     exit;
   end;
 
-  // V-26 — translate the chain's revocation-related bits into our enum,
+  // V-26 - translate the chain's revocation-related bits into our enum,
   // distinct from the overall TChainResult so we can record "checked, good"
   // vs "checked, unreachable" on the receipt.
   if checkRevocation then
@@ -885,14 +885,14 @@ begin
       FRevocationStatus := rsUnknown
     else
       FRevocationStatus := rsGood;
-    // V-26 — when revoked, dig into the leaf chain element's pRevocationInfo
+    // V-26 - when revoked, dig into the leaf chain element's pRevocationInfo
     // to pull out the CRL reason code so the verifier can distinguish
     // keyCompromise (retroactively invalidating) from administrative reasons.
     CaptureLeafRevocationDetail;
   end;
 
   // Map the trust status onto our enum. Populate FLastError on every non-
-  // valid branch — callers (e.g. verify error reporting) format it as
+  // valid branch - callers (e.g. verify error reporting) format it as
   // "chain build: <msg>" and an empty msg there is useless.
   if FChain.TrustStatus.dwErrorStatus = CERT_TRUST_NO_ERROR then
     result := crValid
@@ -921,7 +921,7 @@ begin
     result := crWrongUsage;
   end
   else if (FChain.TrustStatus.dwErrorStatus and not (CERT_TRUST_REVOCATION_STATUS_UNKNOWN or CERT_TRUST_IS_OFFLINE_REVOCATION)) = 0 then
-    // A CRL/OCSP outage by itself shouldn't fail the chain — surface as valid
+    // A CRL/OCSP outage by itself shouldn't fail the chain - surface as valid
     // with rsUnknown so policy can decide what to do. An unreachable revocation
     // server sets CERT_TRUST_IS_OFFLINE_REVOCATION alongside STATUS_UNKNOWN.
     result := crValid

@@ -249,7 +249,7 @@ var
 begin
   target := NormHex(spkiHex);
 
-  // P3 §3.4 — emergency revocation channel always wins. A repository SPKI
+  // P3 §3.4 - emergency revocation channel always wins. A repository SPKI
   // listed in the trust set's revokedRepositorySpki array is never trusted,
   // regardless of being in the user's trustedRepositories or the trust
   // set's own repositorySpki pin list.

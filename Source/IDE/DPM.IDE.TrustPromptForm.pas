@@ -44,7 +44,7 @@ uses
 type
   TTrustPromptResult = (tprOverride, tprCancel, tprBlockAlways);
 
-  // Programmatically constructed (no .dfm) — keeps the form working across
+  // Programmatically constructed (no .dfm) - keeps the form working across
   // every supported Delphi IDE version without needing a designer round-trip.
   TTrustPromptForm = class(TForm)
   private
@@ -85,11 +85,11 @@ begin
   inherited CreateNew(AOwner);
   Position := poScreenCenter;
   BorderStyle := bsDialog;
-  Caption := 'DPM — package signing changed';
+  Caption := 'DPM - package signing changed';
   ClientWidth := cFormWidth;
   ClientHeight := cFormHeight;
   // Default to Cancel so closing the dialog via [X] or Esc does the safe
-  // thing — the install is aborted, the trust state is untouched.
+  // thing - the install is aborted, the trust state is untouched.
   FResult := tprCancel;
   BuildLayout;
 end;

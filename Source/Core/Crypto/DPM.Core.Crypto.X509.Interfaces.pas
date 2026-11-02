@@ -45,7 +45,7 @@ type
     crUnknownError
   );
 
-  // V-26 — distinct from TChainResult because a chain can be revoked-but-
+  // V-26 - distinct from TChainResult because a chain can be revoked-but-
   // accepted (signing predates revocation) and "unknown" is meaningfully
   // different from "good" or "revoked" for receipts and policy.
   TRevocationStatus = (
@@ -114,8 +114,8 @@ type
     /// </summary>
     function PublicKeyBits : integer;
     /// <summary>
-    /// Natural digest pairing for this cert's key. RSA is permissive — any
-    /// of SHA-256/384/512 work — and we return SHA-256 as the sensible
+    /// Natural digest pairing for this cert's key. RSA is permissive - any
+    /// of SHA-256/384/512 work - and we return SHA-256 as the sensible
     /// default. ECDSA is strict (FIPS 186): digest size MUST match curve
     /// size, otherwise CSP/KSP middleware (YubiKey PIV, Azure KV) will
     /// reject the sign with "algorithm not supported". Returns:
@@ -127,7 +127,7 @@ type
     /// explicitly chose a digest on the command line.
     /// </summary>
     function PreferredDigest : THashAlgorithm;
-    // Win32 handle access — only the X509 / CMS layer should call this.
+    // Win32 handle access - only the X509 / CMS layer should call this.
     function GetContext : PCCERT_CONTEXT;
   end;
 
@@ -148,7 +148,7 @@ type
     function Build(const cert : ICertificate;
                    const additionalCerts : array of ICertificate) : TChainResult;
     /// <summary>
-    /// Phase 3 §3.1 — timestamp-aware chain build. Passes `asOfTime` to the
+    /// Phase 3 §3.1 - timestamp-aware chain build. Passes `asOfTime` to the
     /// Win32 chain engine as the evaluation moment, so a revocation that
     /// post-dates `asOfTime` does NOT fail the chain. When `checkRevocation`
     /// is true, the chain engine is asked to consult CRL/OCSP (excluding the
@@ -184,7 +184,7 @@ type
     function RootCertificate : ICertificate;
     function LastErrorMessage : string;
     /// <summary>
-    /// V-26 — revocation outcome captured during the last BuildAtTime call.
+    /// V-26 - revocation outcome captured during the last BuildAtTime call.
     /// rsNotChecked when revocation wasn't requested. Surfaces "unknown"
     /// distinctly from "good"/"revoked" so receipts can record what we did
     /// know and policy can decide what to do with a CRL/OCSP outage.
@@ -192,7 +192,7 @@ type
     function RevocationStatus : TRevocationStatus;
 
     /// <summary>
-    /// V-26 — when the chain came back revoked, the CRL/OCSP reason code.
+    /// V-26 - when the chain came back revoked, the CRL/OCSP reason code.
     /// rrNotApplicable when the chain is good or revocation wasn't checked;
     /// rrUnknown when the reason field is missing or undecodable. The
     /// keyCompromise distinction matters for retroactive validity: every

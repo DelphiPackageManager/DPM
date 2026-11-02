@@ -104,7 +104,7 @@ begin
   else
     searchOption := TSearchOption.soTopDirectoryOnly;
 
-  // Case 1: single existing file. Sign it as-is regardless of name pattern —
+  // Case 1: single existing file. Sign it as-is regardless of name pattern -
   // the user pointed at a specific file.
   if FileExists(target) then
   begin
@@ -198,7 +198,7 @@ begin
         on e : EProviderFatal do
         begin
           // Unrecoverable provider error (bad credentials, server down).
-          // Continuing would just generate one identical failure per file —
+          // Continuing would just generate one identical failure per file -
           // abort the batch immediately even when --fail-fast is off.
           Inc(failCount);
           Logger.Error(ErrorCodeOf(e, TErrorCode.E7102_SigningFailed), 'Unable to sign [' + packageFile + '] : ' + e.Message);

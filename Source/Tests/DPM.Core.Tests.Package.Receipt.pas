@@ -63,9 +63,9 @@ begin
   svc := TYamlReceiptService.Create;
   folder := TempCacheFolder;
   try
-    // YAML is lenient — pick something that parses but produces a scalar
+    // YAML is lenient - pick something that parses but produces a scalar
     // root, which the receipt loader rejects because it expects a mapping.
-    // The contract is "graceful failure, no exception escapes" — i.e. either
+    // The contract is "graceful failure, no exception escapes" - i.e. either
     // returns false OR returns true with an empty / default-initialised record.
     TFile.WriteAllText(svc.ReceiptPath(folder),
       ': : : [unmatched-bracket : not-a-valid-document : :',
@@ -316,7 +316,7 @@ begin
 
     svc.Write(folder, r);
     // Confirm the file genuinely doesn't carry stale attestation keys when
-    // none were set — keeps receipts clean and avoids reader ambiguity.
+    // none were set - keeps receipts clean and avoids reader ambiguity.
     yamlText := TFile.ReadAllText(svc.ReceiptPath(folder));
     Assert.IsTrue(Pos('attestation', yamlText) = 0,
       'attestation block should be omitted when no attestation is present');

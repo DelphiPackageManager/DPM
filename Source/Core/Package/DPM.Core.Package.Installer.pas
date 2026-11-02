@@ -115,7 +115,7 @@ type
     // compiler upgrade (in-place dproj opened in a newer IDE) so the per-compiler locks recorded
     // under the old compiler are discarded rather than failing validation against the new build.
     procedure ClearManifestHashes(const graph : IPackageReference);
-    // P2 §2.6 — checks every locked node in the graph, transitive packages included, against the
+    // P2 §2.6 - checks every locked node in the graph, transitive packages included, against the
     // verification receipt the cache wrote for it, then (only when they all match) sets each node's
     // ManifestHash from its receipt - the editor writes it to the .dproj as `manifestHash="sha256:..."`.
     // Each receipt is read once. The id of every package whose lock did not match is appended to
@@ -448,7 +448,7 @@ begin
     fullPath := TPath.Combine(GetCurrentDir, fullPath);
     fullPath := TPathUtils.CompressRelativePath(fullPath);
   end;
-  // A project that isn't on disk yet (a new, unsaved project — or a transient
+  // A project that isn't on disk yet (a new, unsaved project - or a transient
   // placeholder the IDE creates and removes during project creation) has no
   // package references. Treat "not on disk" as "no references" so the IDE skips
   // restore (and the log window) for new projects. The default-true above is
@@ -3048,7 +3048,7 @@ begin
   if not PrepareProjectPackages(cancellationToken, work.ProjectFile, work.Graph, work.Resolved, packagesToConfigure, packageSpecs) then
     exit;
 
-  // P2 §2.6 — the packages are in the cache : what the project already pinned must be what is there before
+  // P2 §2.6 - the packages are in the cache : what the project already pinned must be what is there before
   // any of it is built (a build runs the package's own project), and the rest are locked to the receipts.
   ApplyGraphLocks(work.Graph, work.Locks);
   if not ValidateAndPopulateManifestHashes(work.Graph, work.Options.CompilerVersion, false, nil) then
@@ -3699,7 +3699,7 @@ begin
       [CompilerToString(storedCompiler), CompilerToString(Options.compilerVersion)]), true);
     ClearManifestHashes(finalGraph);
   end;
-  // P2 §2.6 — the cached packages must be what the project pinned before any of them is built - a build
+  // P2 §2.6 - the cached packages must be what the project pinned before any of them is built - a build
   // runs the package's own project. Checked for the whole graph, transitive packages included, then the
   // locks are refreshed from the receipts.
   //

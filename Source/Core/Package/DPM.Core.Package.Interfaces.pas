@@ -88,7 +88,7 @@ type
     procedure SetSupportedPlatforms(const value : TDPMPlatforms);
     // Gallery-reported signing status (advisory): the server records the
     // signer CN it observed at upload time. The CLI still re-verifies the
-    // signature locally against the trust set before install — these fields
+    // signature locally against the trust set before install - these fields
     // are for display only, so users can see who signed a package before
     // downloading. False / '' against older gallery servers that don't
     // emit the JSON fields.
@@ -104,7 +104,7 @@ type
   end;
 
   ///<summary>Package Info plus metadata. Mirrors ISpecMetaData's shape so everything the author wrote
-  /// in the .dspec survives the round trip through a packed .dpkg — including ReleaseNotes, ReadMe
+  /// in the .dspec survives the round trip through a packed .dpkg - including ReleaseNotes, ReadMe
   /// and Frameworks (planned future use: filter the IDE feed by project type).</summary>
   IPackageMetadata = interface(IPackageInfo)
     ['{0C39A81D-63FF-4939-A74A-4BFE29724168}']
@@ -127,7 +127,7 @@ type
     function GetFrameworks : TArray<TDPMUIFrameworkType>;
 
     property Description : string read GetDescription;
-    //Authors matches the spec shape (IList<string>) — callers that want a display string
+    //Authors matches the spec shape (IList<string>) - callers that want a display string
     //should join at the presentation layer instead of relying on a CSV-joined field here.
     property Authors : IList<string> read GetAuthors;
     property License : string read GetLicense;
@@ -255,7 +255,7 @@ type
     function IsSamePackageVersion(const item : IPackageListItem) : Boolean;
     function IsSamePackageId(const item : IPackageListItem) : boolean;
     function MergeWith(const item : IPackageListItem) : IPackageListItem;
-    // Gallery-reported signing status — see IPackageInfo for details.
+    // Gallery-reported signing status - see IPackageInfo for details.
     function GetIsSigned : boolean;
     function GetSignedBy : string;
 

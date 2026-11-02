@@ -1,7 +1,7 @@
 unit DPM.Core.Tests.SigningBadge;
 
 // IDE-2: SigningBadgeResolver projects a verification receipt onto a small
-// display badge. The resolver itself is pure logic — no VCL dependencies —
+// display badge. The resolver itself is pure logic - no VCL dependencies -
 // so these tests can live in the Core test project.
 
 interface
@@ -48,7 +48,7 @@ uses
   DPM.IDE.SigningBadge;
 
 type
-  // Cache fake — only the GetPackagePath overload the resolver uses needs
+  // Cache fake - only the GetPackagePath overload the resolver uses needs
   // a real return value.
   TStubCache = class(TInterfacedObject, IPackageCache)
   private

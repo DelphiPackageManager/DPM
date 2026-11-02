@@ -1,6 +1,6 @@
 unit DPM.Core.Tests.Trust.Modes;
 
-// Phase 2 §2.4 — exhaustive truth table for TTrustModeEvaluator.Evaluate
+// Phase 2 §2.4 - exhaustive truth table for TTrustModeEvaluator.Evaluate
 // across the four validation modes × (hasAnySignature, hasValidAuthor,
 // hasValidTrustedRepo). Sixteen combinations covered explicitly so a
 // regression in any mode shows up as a named failure.
@@ -122,7 +122,7 @@ begin
   result.PublisherTrusted := pinned;
 end;
 
-{ TTrustModeTests — permissive }
+{ TTrustModeTests - permissive }
 
 procedure TTrustModeTests.Permissive_NoSig_Unsigned;
 var reason : string;
