@@ -52,7 +52,7 @@ begin
   inherited Create(AOwner);
   FLogger := logger;
   FIDEOptions := TDPMIDEOptions.Create;
-  FIDEOptions.LoadFromFile();
+  FIDEOptions.LoadOrCreate(FLogger);
 end;
 
 procedure TOptionsForm.btnCancelClick(Sender: TObject);

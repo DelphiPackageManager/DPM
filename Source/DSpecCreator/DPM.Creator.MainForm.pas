@@ -4094,7 +4094,8 @@ var
   ideOptions : IDPMIDEOptions;
 begin
   ideOptions := TDPMIDEOptions.Create;
-  ideOptions.LoadFromFile();
+  //this is the first thing to touch the .dpm folder, which won't exist if DPM has never run here.
+  ideOptions.LoadOrCreate(FLogger);
   FLogger.Verbosity := ideOptions.LogVerbosity;
   FOpsLogger.Verbosity := ideOptions.LogVerbosity;
 end;

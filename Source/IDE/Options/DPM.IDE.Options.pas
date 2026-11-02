@@ -5,6 +5,7 @@ interface
 uses
   JsonDataObjects,
   DPM.Core.Types,
+  DPM.Core.Logging,
   //for TDPMUpdateChannel - already used by the implementation section.
   DPM.IDE.Types;
 
@@ -13,6 +14,12 @@ type
   ['{7DC7324F-781C-4400-AFB7-E68FB9066494}']
     function LoadFromFile(const fileName : string = '') : boolean;
     function SaveToFile(const fileName : string = '') : boolean;
+
+    /// <summary>
+    ///  Loads the options file, or creates it (and the .dpm folder) with the defaults when there isn't one.
+    ///  A file that can't be read leaves the defaults in place and is reported as a warning.
+    /// </summary>
+    procedure LoadOrCreate(const logger : ILogger);
 
     function GetOptionsFileName : string;
 
@@ -83,6 +90,7 @@ type
 
     function LoadFromFile(const fileName: string = ''): Boolean;
     function SaveToFile(const fileName: string = ''): Boolean;
+    procedure LoadOrCreate(const logger : ILogger);
 
     function GetOptionsFileName : string;
 
@@ -125,7 +133,8 @@ implementation
 uses
   System.SysUtils,
   System.TypInfo,
-  DPM.Core.Utils.System;
+  DPM.Core.Utils.System,
+  DPM.Core.Diagnostics;
 
 { TDPMIDEOptions }
 
@@ -240,6 +249,27 @@ begin
   except
     on e : Exception do
       raise Exception.Create('Exception while loading config file [' + sFileName + ']' + #13#10 + e.Message);
+  end;
+end;
+
+procedure TDPMIDEOptions.LoadOrCreate(const logger : ILogger);
+begin
+  if FileExists(FFileName) then
+  begin
+    //a file that can't be read (edited by hand, cut short) mustn't stop the IDE plugin or DSpecCreator loading - the
+    //defaults instead, and say so. The file is left for whoever wants to look at it; saving the options replaces it.
+    try
+      LoadFromFile();
+    except
+      on e : Exception do
+        logger.Warning(TWarningCode.W9108_IDEOptionsUnreadable, e.Message + sLineBreak + 'Using the default options.');
+    end;
+  end
+  else
+  begin
+    //nothing DPM has run on this machine yet, so the .dpm folder may be missing too.
+    ForceDirectories(ExtractFilePath(FFileName));
+    SaveToFile(); //create the file
   end;
 end;
 

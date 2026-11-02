@@ -326,6 +326,9 @@
         <DCCReference Include="IDE\DPM.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.IDE.EnvironmentVariableManager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.IDE.PathManager.pas"/>
+        <DCCReference Include="IDE\DPM.IDE.Types.pas"/>
+        <DCCReference Include="IDE\Options\DPM.IDE.Options.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.IDE.Options.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Cache.PackageId.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.DateTime.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.Strings.pas"/>

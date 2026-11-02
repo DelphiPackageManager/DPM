@@ -387,22 +387,7 @@ begin
   InitContainer;
   FLogger := FContainer.Resolve<IDPMIDELogger>;
   dpmIDEOptions := FContainer.Resolve<IDPMIDEOptions>;
-  if FileExists(dpmIDEOptions.FileName) then
-  begin
-    //a file that can't be read (edited by hand, cut short) stopped the plugin loading - the defaults instead, and
-    //say so. The file is left for whoever wants to look at it; saving the options replaces it.
-    try
-      dpmIDEOptions.LoadFromFile();
-    except
-      on e : Exception do
-        FLogger.Warning(TWarningCode.W9108_IDEOptionsUnreadable, e.Message + sLineBreak + 'Using the default options.');
-    end;
-  end
-  else
-  begin
-    TConfigUtils.EnsureDefaultConfigDir;
-    dpmIDEOptions.SaveToFile(); //create the file
-  end;
+  dpmIDEOptions.LoadOrCreate(FLogger);
 
   FLogger.Verbosity := dpmIDEOptions.LogVerbosity;
 
