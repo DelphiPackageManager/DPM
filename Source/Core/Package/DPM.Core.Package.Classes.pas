@@ -162,7 +162,8 @@ uses
   System.SysUtils,
   System.RegularExpressions,
   System.Zip,
-  DPM.Core.Utils.Hash;
+  DPM.Core.Utils.Hash,
+  DPM.Core.Utils.Strings;
 
 { TPackageMetadata }
 
@@ -504,6 +505,7 @@ var
   sList : TStringList;
   i: Integer;
   authorsStr : string;
+  tagList : TArray<string>;
 begin
   inherited Create(sourceName, jsonObj);
   FSearchPaths := TCollections.CreateList<string>;
@@ -534,8 +536,9 @@ begin
   FIsTrial        := jsonObj.B['isTrial'];
   FLicense        := jsonObj.S['License'];
   FProjectUrl     := jsonObj.S['ProjectUrl'];
-  if jsonObj.Contains('Tags')  then
-    FTags.Text    := jsonObj.S['Tags'];
+  tagList := TStringUtils.SplitTags(jsonObj.S['Tags']);
+  for i := 0 to High(tagList) do
+    FTags.Add(tagList[i]);
   FRepositoryUrl  := jsonObj.S['RepositoryUrl'];
   FRepositoryType := jsonObj.S['RepositoryType'];
   FRepositoryBranch := jsonObj.S['RepositoryBranch'];

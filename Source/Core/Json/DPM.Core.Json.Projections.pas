@@ -47,7 +47,8 @@ uses
   this output, and most of it round trips back through the existing FromJson factories.
 
   Two deliberate departures from the wire format, both type upgrades:
-    - `tags` is a JSON array. On the wire it is a single space delimited string.
+    - `tags` is a JSON array. On the wire it is a single string, space separated from older
+      galleries and comma separated from newer ones.
     - `authors` is a JSON array. On the wire it is a single comma delimited string.
   Both are IList<string>/TStrings on the interfaces, so an array is the honest representation.
   It does mean tags and authors do not survive a byte level round trip through FromJson.

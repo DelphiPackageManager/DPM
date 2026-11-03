@@ -132,9 +132,9 @@ object DSpecCreatorForm: TDSpecCreatorForm
       object Label4: TLabel
         Left = 89
         Top = 452
-        Width = 113
+        Width = 239
         Height = 15
-        Caption = 'Space separated tags '
+        Caption = 'Comma separated tags - e.g. json, yaml, parser'
         Enabled = False
       end
       object lblPackageId: TLabel

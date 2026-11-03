@@ -74,6 +74,12 @@ type
     //the --sources value - a source's name may contain a space.
     procedure SplitTrimmed_KeepsSpacesInsideItems;
     procedure SplitTrimmed_TrimsAndDropsEmptyItems;
+    //tags come comma separated from newer galleries and the dspec creator, space separated from
+    //older galleries.
+    procedure SplitTags_CommaSeparated;
+    procedure SplitTags_SpaceSeparated;
+    procedure SplitTags_MixedSeparatorsAndEmptyItems;
+    procedure SplitTags_Empty_ReturnsNoTags;
   end;
 
 implementation
@@ -164,6 +170,46 @@ begin
   Assert.AreEqual('DPM', items[0], false);
   Assert.AreEqual('My Feed', items[1], false);
   Assert.AreEqual(0, Length(TStringUtils.SplitTrimmed('', ',')));
+end;
+
+procedure TStringUtilsTests.SplitTags_CommaSeparated;
+var
+  tags : TArray<string>;
+begin
+  tags := TStringUtils.SplitTags('yaml,parser,vsoft');
+  Assert.AreEqual(3, Length(tags));
+  Assert.AreEqual('yaml', tags[0], false);
+  Assert.AreEqual('parser', tags[1], false);
+  Assert.AreEqual('vsoft', tags[2], false);
+end;
+
+procedure TStringUtilsTests.SplitTags_SpaceSeparated;
+var
+  tags : TArray<string>;
+begin
+  tags := TStringUtils.SplitTags('yaml parser vsoft');
+  Assert.AreEqual(3, Length(tags));
+  Assert.AreEqual('yaml', tags[0], false);
+  Assert.AreEqual('parser', tags[1], false);
+  Assert.AreEqual('vsoft', tags[2], false);
+end;
+
+procedure TStringUtilsTests.SplitTags_MixedSeparatorsAndEmptyItems;
+var
+  tags : TArray<string>;
+begin
+  tags := TStringUtils.SplitTags(' ,json, yaml'#9'parser,,'#13#10'vsoft , ');
+  Assert.AreEqual(4, Length(tags));
+  Assert.AreEqual('json', tags[0], false);
+  Assert.AreEqual('yaml', tags[1], false);
+  Assert.AreEqual('parser', tags[2], false);
+  Assert.AreEqual('vsoft', tags[3], false);
+end;
+
+procedure TStringUtilsTests.SplitTags_Empty_ReturnsNoTags;
+begin
+  Assert.AreEqual(0, Length(TStringUtils.SplitTags('')));
+  Assert.AreEqual(0, Length(TStringUtils.SplitTags(' , ,')));
 end;
 
 initialization

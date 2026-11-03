@@ -673,6 +673,7 @@ uses
   DPM.Core.Options.Push,
   DPM.Core.Utils.Config,
   DPM.Core.Utils.Spdx,
+  DPM.Core.Utils.Strings,
   VSoft.Windows.CredentialManager,
   DPM.Creator.TemplateForm,
   DPM.Creator.FileForm,
@@ -699,6 +700,38 @@ const
   cCredAzureClientId = 'DPM.DspecCreator.Signing.AzureClientId';
   // Upload api keys are stored per source name in the credential manager.
   cCredUploadApiKeyPrefix = 'DPM.DspecCreator.Upload.ApiKey.';
+
+// Tags are shown comma separated - e.g. 'json, yaml, parser'.
+function TagsToText(const tags : TStrings) : string;
+var
+  i : integer;
+begin
+  result := '';
+  for i := 0 to tags.Count - 1 do
+  begin
+    if result <> '' then
+      result := result + ', ';
+    result := result + tags[i];
+  end;
+end;
+
+// Tags are entered comma separated. A tag is a single word, so whitespace also
+// separates tags - see TStringUtils.SplitTags.
+procedure TextToTags(const value : string; const tags : TStrings);
+var
+  tagList : TArray<string>;
+  i : integer;
+begin
+  tagList := TStringUtils.SplitTags(value);
+  tags.BeginUpdate;
+  try
+    tags.Clear;
+    for i := 0 to High(tagList) do
+      tags.Add(tagList[i]);
+  finally
+    tags.EndUpdate;
+  end;
+end;
 
 procedure TDSpecCreatorForm.btnDeleteExcludeClick(Sender : TObject);
 var
@@ -3568,7 +3601,9 @@ end;
 
 procedure TDSpecCreatorForm.edtTagsChange(Sender : TObject);
 begin
-  FOpenFile.PackageSpec.metadata.tags.CommaText := edtTags.Text;
+  if FLoadingSpec then
+    exit;
+  TextToTags(edtTags.Text, FOpenFile.PackageSpec.metadata.tags);
 end;
 
 function TDSpecCreatorForm.TryRenameTemplate(const node : TTemplateTreeNode; const currentName : string; const newName : string) : boolean;
@@ -3794,7 +3829,7 @@ begin
     edtAuthor.Text := '';
   edtCopyright.Text := FOpenFile.PackageSpec.metadata.Copyright;
   cboLicense.Text := FOpenFile.PackageSpec.metadata.license;
-  edtTags.Text := FOpenFile.PackageSpec.metadata.tags.CommaText;
+  edtTags.Text := TagsToText(FOpenFile.PackageSpec.metadata.tags);
   edtReadme.Text := FOpenFile.PackageSpec.metadata.Readme;
   chkIsCommercial.Checked := FOpenFile.PackageSpec.metadata.IsCommercial;
   chkIsTrial.Checked := FOpenFile.PackageSpec.metadata.IsTrial;

@@ -41,6 +41,10 @@ type
     //value split on separator alone (a space inside an item is part of it - unlike a TStringList without
     //StrictDelimiter), each item trimmed, the empty ones dropped. 'DPM, My Feed,' -> ['DPM', 'My Feed'].
     class function SplitTrimmed(const value : string; const separator : Char) : TArray<string>;
+    //a package's tags from a list separated by commas, whitespace or both - 'json, yaml parser' ->
+    //['json', 'yaml', 'parser']. A tag is a single word. Older galleries send tags space separated,
+    //newer ones comma separated, and the dspec creator takes them comma separated.
+    class function SplitTags(const value : string) : TArray<string>;
     class function StartsWith(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
     class function Contains(const theString : string; const value : string; const IgnoreCase : boolean = false) : boolean;
     //Stands in for string.Join - TStringHelper does not exist before XE3, and Core is compiled
@@ -201,6 +205,31 @@ begin
       continue;
     result[count] := Trim(items[i]);
     Inc(count);
+  end;
+  SetLength(result, count);
+end;
+
+class function TStringUtils.SplitTags(const value : string) : TArray<string>;
+var
+  i : integer;
+  startPos : integer;
+  count : integer;
+begin
+  //no more tags than separators + 1, trimmed to what was found at the end.
+  SetLength(result, Length(value) div 2 + 1);
+  count := 0;
+  startPos := 1;
+  for i := 1 to Length(value) + 1 do
+  begin
+    if (i > Length(value)) or (value[i] = ',') or (value[i] <= ' ') then
+    begin
+      if i > startPos then
+      begin
+        result[count] := Copy(value, startPos, i - startPos);
+        Inc(count);
+      end;
+      startPos := i + 1;
+    end;
   end;
   SetLength(result, count);
 end;

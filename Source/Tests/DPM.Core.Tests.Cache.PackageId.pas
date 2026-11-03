@@ -34,6 +34,13 @@ type
     //a feed's searchPaths is ';' separated - a space is part of a path.
     [Test]
     procedure Feed_Json_Search_Paths_Keep_Their_Spaces;
+    //newer galleries send a search result's tags comma separated, older ones space separated.
+    [Test]
+    procedure Feed_Json_Search_Result_Tags_Comma_Separated;
+    [Test]
+    procedure Feed_Json_Search_Result_Tags_Space_Separated;
+    [Test]
+    procedure Feed_Json_Metadata_Tags_Comma_Separated;
     [Test]
     procedure Package_Spec_With_An_Invalid_Id_Is_Refused;
   end;
@@ -50,6 +57,7 @@ uses
   DPM.Core.Dependency.Version,
   DPM.Core.Package.Interfaces,
   DPM.Core.Package.Classes,
+  DPM.Core.Package.SearchResults,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Spec.Reader,
   DPM.Core.Cache.Interfaces,
@@ -169,6 +177,52 @@ begin
     Assert.AreEqual(2, metadata.SearchPaths.Count);
     Assert.AreEqual('Source', metadata.SearchPaths[0], false);
     Assert.AreEqual('Source\Some Folder', metadata.SearchPaths[1], false);
+  finally
+    json.Free;
+  end;
+end;
+
+procedure CheckSearchResultTags(const tagsJson : string);
+var
+  json : TJsonObject;
+  item : IPackageSearchResultItem;
+begin
+  json := TJsonObject.Parse('{"id":"VSoft.Foo","compiler":"12.0","version":"1.0.0","tags":"' + tagsJson + '"}') as TJsonObject;
+  try
+    item := TDPMPackageSearchResultItem.FromJson('feed', json);
+    Assert.AreEqual(3, item.Tags.Count, item.Tags.CommaText);
+    Assert.AreEqual('yaml', item.Tags[0], false);
+    Assert.AreEqual('parser', item.Tags[1], false);
+    Assert.AreEqual('vsoft', item.Tags[2], false);
+  finally
+    json.Free;
+  end;
+end;
+
+procedure TPackageIdTests.Feed_Json_Search_Result_Tags_Comma_Separated;
+begin
+  CheckSearchResultTags('yaml,parser,vsoft');
+end;
+
+procedure TPackageIdTests.Feed_Json_Search_Result_Tags_Space_Separated;
+begin
+  CheckSearchResultTags('yaml parser vsoft');
+end;
+
+procedure TPackageIdTests.Feed_Json_Metadata_Tags_Comma_Separated;
+var
+  logger : ILogger;
+  json : TJsonObject;
+  metadata : IPackageMetadata;
+begin
+  logger := TTestLogger.Create;
+  json := TJsonObject.Parse('{"id":"VSoft.Foo","compiler":"12.0","version":"1.0.0","Tags":"yaml, parser,vsoft"}') as TJsonObject;
+  try
+    Assert.IsTrue(TPackageMetadata.TryLoadFromJson(logger, json, 'feed', metadata));
+    Assert.AreEqual(3, metadata.Tags.Count, metadata.Tags.CommaText);
+    Assert.AreEqual('yaml', metadata.Tags[0], false);
+    Assert.AreEqual('parser', metadata.Tags[1], false);
+    Assert.AreEqual('vsoft', metadata.Tags[2], false);
   finally
     json.Free;
   end;

@@ -147,6 +147,7 @@ uses
   System.SysUtils,
   DPM.Core.Git.Interfaces,
   DPM.Core.Utils.DateTime,
+  DPM.Core.Utils.Strings,
   DPM.Core.Package.Dependency;
 
 procedure SplitCsvIntoList(const csv : string; const target : IList<string>);
@@ -194,7 +195,7 @@ var
   i: Integer;
   range : TVersionRange;
   dependency : IPackageDependency;
-  tagsStr : string;
+  tagList : TArray<string>;
   latestStable : string;
 begin
   FSourceName := sourceName;
@@ -233,13 +234,10 @@ begin
   if jsonObject.Contains('platforms') then
     FSupportedPlatforms := StringToDPMPlatforms(jsonObject.S['platforms']);
 
-  tagsStr := jsonObject.S['tags'];
-  if tagsStr <> '' then
-  begin
-    FTags.Delimiter := ' ';
-    FTags.StrictDelimiter := true;
-    FTags.DelimitedText := tagsStr;
-  end;
+  //older galleries send tags space separated, newer ones comma separated - take either.
+  tagList := TStringUtils.SplitTags(jsonObject.S['tags']);
+  for i := 0 to High(tagList) do
+    FTags.Add(tagList[i]);
 
   FDownloadCount    := jsonObject.L['totalDownloads'];
   FHashAlgorithm    := jsonObject.S['hashAlgorithm'];
