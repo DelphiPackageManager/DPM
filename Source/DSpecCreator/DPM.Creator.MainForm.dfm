@@ -181,6 +181,14 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Alignment = taRightJustify
         Caption = 'Readme:'
       end
+      object lblFrameworks: TLabel
+        Left = 16
+        Top = 528
+        Width = 67
+        Height = 15
+        Alignment = taRightJustify
+        Caption = 'Frameworks:'
+      end
       object lblPackageVariables: TLabel
         Left = 488
         Top = 165
@@ -328,6 +336,24 @@ object DSpecCreatorForm: TDSpecCreatorForm
         Caption = 'Trial package'
         TabOrder = 14
         OnClick = chkIsTrialClick
+      end
+      object chkFrameworkVCL: TCheckBox
+        Left = 89
+        Top = 527
+        Width = 180
+        Height = 17
+        Caption = 'VCL'
+        TabOrder = 15
+        OnClick = chkFrameworkClick
+      end
+      object chkFrameworkFMX: TCheckBox
+        Left = 285
+        Top = 527
+        Width = 180
+        Height = 17
+        Caption = 'FMX'
+        TabOrder = 16
+        OnClick = chkFrameworkClick
       end
       object PackageVariablesList: TValueListEditor
         Left = 488

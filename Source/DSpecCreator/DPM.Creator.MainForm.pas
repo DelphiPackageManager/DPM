@@ -252,6 +252,9 @@ type
     edtReadme: TEdit;
     chkIsCommercial : TCheckBox;
     chkIsTrial : TCheckBox;
+    lblFrameworks : TLabel;
+    chkFrameworkVCL : TCheckBox;
+    chkFrameworkFMX : TCheckBox;
     Label14: TLabel;
     edtRepositoryCommit: TEdit;
     Label13: TLabel;
@@ -499,6 +502,7 @@ type
     procedure btnBrowsePfxClick(Sender : TObject);
     procedure chkIsCommercialClick(Sender : TObject);
     procedure chkIsTrialClick(Sender : TObject);
+    procedure chkFrameworkClick(Sender : TObject);
   private
     { Private declarations }
     FtmpFilename : string;
@@ -3559,6 +3563,28 @@ begin
   FOpenFile.PackageSpec.metadata.IsTrial := chkIsTrial.Checked;
 end;
 
+procedure TDSpecCreatorForm.chkFrameworkClick(Sender : TObject);
+var
+  frameworks : TArray<TDPMUIFrameworkType>;
+begin
+  //setting Checked while loading fires OnClick - rebuilding from a half-loaded pair of
+  //checkboxes would drop a framework, so leave the spec alone until the load is done.
+  if FLoadingSpec then
+    exit;
+  frameworks := nil;
+  if chkFrameworkVCL.Checked then
+  begin
+    SetLength(frameworks, Length(frameworks) + 1);
+    frameworks[Length(frameworks) - 1] := TDPMUIFrameworkType.VCL;
+  end;
+  if chkFrameworkFMX.Checked then
+  begin
+    SetLength(frameworks, Length(frameworks) + 1);
+    frameworks[Length(frameworks) - 1] := TDPMUIFrameworkType.FMX;
+  end;
+  FOpenFile.PackageSpec.metadata.Frameworks := frameworks;
+end;
+
 procedure TDSpecCreatorForm.edtRepositoryCommitChange(Sender: TObject);
 begin
   FOpenFile.PackageSpec.metadata.RepositoryCommit := Trim(edtRepositoryCommit.Text);
@@ -3816,6 +3842,7 @@ var
   j : integer;
   compilerVersion : TCompilerVersion;
   pair : TPair<string,string>;
+  frameworks : TArray<TDPMUIFrameworkType>;
 begin
   edtId.Text := FOpenFile.PackageSpec.metadata.id;
   edtVersion.Text := FOpenFile.PackageSpec.metadata.Version.ToString;
@@ -3833,6 +3860,16 @@ begin
   edtReadme.Text := FOpenFile.PackageSpec.metadata.Readme;
   chkIsCommercial.Checked := FOpenFile.PackageSpec.metadata.IsCommercial;
   chkIsTrial.Checked := FOpenFile.PackageSpec.metadata.IsTrial;
+  chkFrameworkVCL.Checked := false;
+  chkFrameworkFMX.Checked := false;
+  frameworks := FOpenFile.PackageSpec.metadata.Frameworks;
+  for i := 0 to Length(frameworks) - 1 do
+  begin
+    case frameworks[i] of
+      TDPMUIFrameworkType.VCL : chkFrameworkVCL.Checked := true;
+      TDPMUIFrameworkType.FMX : chkFrameworkFMX.Checked := true;
+    end;
+  end;
   if Length(FOpenFile.PackageSpec.metadata.Icon) > 0 then
     ShowIcon(TPath.Combine(FOpenFile.WorkingDir, FOpenFile.PackageSpec.metadata.Icon))
   else
