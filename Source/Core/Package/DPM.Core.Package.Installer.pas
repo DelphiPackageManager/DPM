@@ -225,6 +225,21 @@ type
       const config: IConfiguration; const projectPackageGraph: IPackageReference;
       const resolvedPackages: IList<IPackageInfo>; const packageSpecs: IDictionary<string, IPackageSpec>): boolean;
 
+    //Whether this machine can build for platform - its compiler is installed, and any SDK it needs is configured. When
+    //it can't, says the platform is skipped and why. A skipped platform is not a failure - it isn't built at all.
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : boolean;
+
+    //Whether the package is built against FireMonkey - its spec says it uses the FMX framework, or one of its build
+    //projects requires the fmx package.
+    function PackageNeedsFMX(const packageInfo : IPackageInfo; const spec : IPackageSpec) : boolean;
+
+    //The packages that can't be built for platform because they use FireMonkey and it isn't installed for it (FMX for
+    //Linux is a GetIt package), and the packages that need one of them - lowercase id -> why. Only packages in
+    //packages are considered. Says each is skipped when logSkips. Not a failure - they aren't built for platform at all.
+    function FMXSkips(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const graph : IPackageReference;
+                      const packages : IList<IPackageInfo>; const packageSpecs : IDictionary<string, IPackageSpec>;
+                      const logSkips : boolean) : IDictionary<string, string>;
+
     // Resolves project files from path (handles .dproj, .groupproj, directory, or explicit list)
     function ResolveProjectFiles(const projectPath: string; const explicitProjects: TArray<string>;
       const projectList: IList<string>): boolean;
@@ -356,6 +371,8 @@ uses
   System.IOUtils,
   System.Types,
   System.SysUtils,
+  System.Classes,
+  System.RegularExpressions,
   Spring,
   Spring.Collections.Extensions,
   VSoft.AntPatterns,
@@ -391,6 +408,55 @@ type
 function DeclaresPlatform(const spec : IPackageSpec; const platform : TDPMPlatform) : boolean;
 begin
   result := (spec.TargetPlatform = nil) or (spec.TargetPlatform.Platforms = []) or PlatformSatisfiedBy(platform, spec.TargetPlatform.Platforms);
+end;
+
+//Whether a package project requires FireMonkey's runtime package - the IDE lists the dpk's requires clause in the
+//dproj as <DCCReference Include="fmx.dcp"/> items, and the dpk next to it says 'requires ..., fmx'.
+function ProjectRequiresFMX(const projectFile : string) : boolean;
+var
+  text : string;
+  dpkFile : string;
+  requiresMatch : TMatch;
+  requiredPackages : TStringList;
+  i : integer;
+begin
+  result := false;
+  if FileExists(projectFile) then
+  begin
+    try
+      text := LowerCase(TFile.ReadAllText(projectFile));
+    except
+      text := '';
+    end;
+    if (Pos('include="fmx.dcp"', text) > 0) or (Pos('include=''fmx.dcp''', text) > 0) then
+      exit(true);
+  end;
+  dpkFile := ChangeFileExt(projectFile, '.dpk');
+  if not FileExists(dpkFile) then
+    exit;
+  try
+    text := TFile.ReadAllText(dpkFile);
+  except
+    exit;
+  end;
+  //comments (compiler directives included) first - so neither a commented out package nor the word in a comment counts.
+  text := TRegEx.Replace(text, '\{[^}]*\}', ' ');
+  text := TRegEx.Replace(text, '\(\*.*?\*\)', ' ', [roSingleLine]);
+  text := TRegEx.Replace(text, '//[^\r\n]*', ' ');
+  requiresMatch := TRegEx.Match(text, '\brequires\b([^;]*);', [roIgnoreCase]);
+  if not requiresMatch.Success then
+    exit;
+  requiredPackages := TStringList.Create;
+  try
+    requiredPackages.StrictDelimiter := true;
+    requiredPackages.Delimiter := ',';
+    requiredPackages.DelimitedText := requiresMatch.Groups[1].Value;
+    for i := 0 to requiredPackages.Count - 1 do
+      if SameText(Trim(requiredPackages[i]), 'fmx') then
+        exit(true);
+  finally
+    requiredPackages.Free;
+  end;
 end;
 
 //Design entries DPM compiles into a design BPL - prebuilt ones ship theirs, for the IDE bitness they name.
@@ -503,6 +569,7 @@ var
   platforms : TDPMPlatforms;
   platform : TDPMPlatform;
   searchPaths : IList<string>;
+  fmxSkipped : IDictionary<string, string>;
 begin
   result := false;
 
@@ -573,6 +640,15 @@ begin
       else
         supportedPackages.Add(info);
     end;
+    //Nor one that uses FireMonkey where it isn't installed, or needs one that does - restore left them out too (and
+    //said so).
+    fmxSkipped := FMXSkips(compilerVersion, platform, graph, supportedPackages, packageSpecs, false);
+    if fmxSkipped.Count > 0 then
+      supportedPackages.RemoveAll(
+        function(const value : IPackageInfo) : boolean
+        begin
+          result := fmxSkipped.ContainsKey(LowerCase(value.Id));
+        end);
     searchPaths := TCollections.CreateList<string>;
     if not CollectSearchPaths(cancellationToken, graph, supportedPackages, supportedPackages, compilerVersion, platform, searchPaths) then
       exit(false);
@@ -1684,6 +1760,7 @@ var
   packagesToCompile: IList<IPackageInfo>;
   compiledPackages: IList<IPackageInfo>;
   pkgInfo: IPackageInfo;
+  fmxSkipped: IDictionary<string, string>;
 const
   //There is no project in the cache flow - the resolver only uses this as a key for cross-project
   //conflict detection, and the cache command resolves a single package in isolation, so a synthetic
@@ -1748,6 +1825,11 @@ begin
     if cancellationToken.IsCancelled then
       exit;
 
+    //a platform this machine can't build (its compiler or SDK isn't installed) is left out of the cache entry - it is
+    //built when the package is next installed on a machine that can.
+    if not CanBuildPlatform(Options.CompilerVersion, platform) then
+      continue;
+
     packageCompiler := FCompilerFactory.CreateCompiler(Options.CompilerVersion, platform);
 
     //BuildDependencies removes packages from this list as it compiles them, so it needs a fresh copy
@@ -1762,6 +1844,19 @@ begin
         continue;
       packagesToCompile.Add(pkgInfo);
     end;
+
+    //Nor those that use FireMonkey when it isn't installed for the platform (FMX for Linux is a GetIt package), or
+    //that need one that does. When that is the package being cached, nothing is built for the platform - nothing else
+    //needs its dependencies built for it.
+    fmxSkipped := FMXSkips(Options.CompilerVersion, platform, dependencyGraph, packagesToCompile, packageSpecs, true);
+    if fmxSkipped.ContainsKey(LowerCase(packageInfo.Id)) then
+      continue;
+    if fmxSkipped.Count > 0 then
+      packagesToCompile.RemoveAll(
+        function(const value : IPackageInfo) : boolean
+        begin
+          result := fmxSkipped.ContainsKey(LowerCase(value.Id));
+        end);
 
     if packagesToCompile.Count = 0 then
       continue;
@@ -2301,6 +2396,108 @@ begin
 
 end;
 
+function TPackageInstaller.CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : boolean;
+var
+  reason : string;
+begin
+  result := FCompilerFactory.CanBuildPlatform(compilerVersion, platform, reason);
+  //Information, not a warning - projects often target platforms this machine doesn't have (an FMX project lists them
+  //all), and the platform can't be built here whatever DPM does.
+  if not result then
+    FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - ' + reason + '.', true);
+end;
+
+function TPackageInstaller.PackageNeedsFMX(const packageInfo : IPackageInfo; const spec : IPackageSpec) : boolean;
+var
+  framework : TDPMUIFrameworkType;
+  template : ISpecTemplate;
+  definition : ISpecPackageDefinition;
+  requiredPackage : string;
+  buildEntry : ISpecBuildEntry;
+  packagePath : string;
+  projectFile : string;
+begin
+  result := false;
+  if spec = nil then
+    exit;
+  //the package says so.
+  if spec.MetaData <> nil then
+    for framework in spec.MetaData.Frameworks do
+      if framework = TDPMUIFrameworkType.FMX then
+        exit(true);
+  if spec.TargetPlatform = nil then
+    exit;
+  template := spec.FindTemplate(spec.TargetPlatform.TemplateName);
+  if template = nil then
+    exit;
+  //a package definition - DPM generates its project at build time, from what it requires.
+  for definition in template.PackageDefinitions do
+    for requiredPackage in definition.Requires do
+      if SameText(Trim(requiredPackage), 'fmx') then
+        exit(true);
+  //its own projects. Only ones inside the package - the build refuses any other (E5019), and says so.
+  packagePath := FPackageCache.GetPackagePath(packageInfo);
+  for buildEntry in template.BuildEntries do
+    if TPathUtils.TryResolveInFolder(packagePath, buildEntry.Project, projectFile) and ProjectRequiresFMX(projectFile) then
+      exit(true);
+end;
+
+function TPackageInstaller.FMXSkips(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const graph : IPackageReference;
+                                    const packages : IList<IPackageInfo>; const packageSpecs : IDictionary<string, IPackageSpec>;
+                                    const logSkips : boolean) : IDictionary<string, string>;
+var
+  skips : IDictionary<string, string>;
+  candidates : IDictionary<string, IPackageInfo>;
+  visited : ISet<string>;
+  info : IPackageInfo;
+  fmxReason : string;
+begin
+  skips := TCollections.CreateDictionary<string, string>;
+  result := skips;
+  if (graph = nil) or (packages = nil) or (packages.Count = 0) then
+    exit;
+  //Nearly always - the packages' projects are only read when FireMonkey isn't there for the platform.
+  if FCompilerFactory.CanBuildFMX(compilerVersion, platform, fmxReason) then
+    exit;
+
+  candidates := TCollections.CreateDictionary<string, IPackageInfo>;
+  for info in packages do
+    candidates[LowerCase(info.Id)] := info;
+  visited := TCollections.CreateSet<string>;
+  //Dependencies are visited before the packages that use them, so a package that needs a skipped one is skipped too -
+  //it can't be compiled without it.
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    var
+      key : string;
+      nodeInfo : IPackageInfo;
+      child : IPackageReference;
+      spec : IPackageSpec;
+      reason : string;
+    begin
+      key := LowerCase(node.Id);
+      if visited.Contains(key) then
+        exit;
+      visited.Add(key);
+      if not candidates.TryGetValue(key, nodeInfo) then
+        exit;
+      reason := '';
+      for child in node.Children do
+        if skips.ContainsKey(LowerCase(child.Id)) then
+        begin
+          reason := 'it needs [' + child.Id + '], which is skipped';
+          break;
+        end;
+      if (reason = '') and packageSpecs.TryGetValue(key, spec) and PackageNeedsFMX(nodeInfo, spec) then
+        reason := 'it uses FMX, and ' + fmxReason;
+      if reason = '' then
+        exit;
+      skips[key] := reason;
+      if logSkips then
+        FLogger.Information('Package [' + nodeInfo.Id + '] skipped for [' + DPMPlatformToString(platform) + '] - ' + reason + '.', true);
+    end);
+end;
+
 function TPackageInstaller.DoConfigurePackageForPlatform(const cancellationToken: ICancellationToken; const options: TSearchOptions;
   const projectFile: string; const projectEditor: IProjectEditor; const platform: TDPMPlatform;
   const config: IConfiguration; const projectPackageGraph: IPackageReference;
@@ -2316,6 +2513,7 @@ var
   spec: IPackageSpec;
   unsupportedList: string;
   id: string;
+  fmxSkipped: IDictionary<string, string>;
 begin
   result := false;
 
@@ -2351,10 +2549,23 @@ begin
       DPMPlatformToString(platform) + '].', true);
   end;
 
+  //Packages that use FireMonkey are left out of a platform it isn't installed for (FMX for Linux is a GetIt package),
+  //along with the packages that need them - they can't be built for it, and the rest can (it said so).
+  fmxSkipped := FMXSkips(options.compilerVersion, platform, projectPackageGraph, supportedPackages, packageSpecs, true);
+  if fmxSkipped.Count > 0 then
+    supportedPackages.RemoveAll(
+      function(const value : IPackageInfo) : boolean
+      begin
+        result := fmxSkipped.ContainsKey(LowerCase(value.Id));
+      end);
+
   // Nothing supports this platform - skip it entirely (not an error).
   if supportedPackages.Count = 0 then
   begin
-    FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - not supported by any packages', true);
+    if fmxSkipped.Count > 0 then
+      FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - none of its packages can be built for it', true)
+    else
+      FLogger.Information('Platform [' + DPMPlatformToString(platform) + '] skipped - not supported by any packages', true);
     result := true;
     exit;
   end;
@@ -3065,6 +3276,10 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit;
+    //Neither built nor failed - its search path is left as it was, and a restore on a machine that can build it
+    //finishes it.
+    if not CanBuildPlatform(work.Options.CompilerVersion, platform) then
+      continue;
     FLogger.Information('Installing into [' + work.ProjectFile + '] for platform [' + DPMPlatformToString(platform) + ']', true);
     // do not modify the work's options!
     platformOptions := work.Options.Clone;
@@ -3728,6 +3943,10 @@ begin
   begin
     if cancellationToken.IsCancelled then
       exit(false);
+
+    //Neither built nor failed - its search path is left as it was.
+    if not CanBuildPlatform(Options.compilerVersion, platform) then
+      continue;
 
     // do not modify options here!
     platformOptions := Options.Clone;

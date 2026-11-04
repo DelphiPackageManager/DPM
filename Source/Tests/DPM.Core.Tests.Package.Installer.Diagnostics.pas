@@ -88,6 +88,31 @@ type
     //dpm cache install - and DSpecCreator's test of a package, which is one - builds every platform the package supports.
     [Test]
     procedure Cache_A_Failing_Platform_Still_Builds_The_Others;
+    //A platform this machine can't build (its compiler or SDK isn't installed) is skipped - not tried, and not a
+    //failure : the other platforms are installed, restored or cached and the operation succeeds.
+    [Test]
+    procedure Install_Skips_A_Platform_That_Cannot_Be_Built;
+    [Test]
+    procedure Restore_Skips_A_Platform_That_Cannot_Be_Built;
+    [Test]
+    procedure Cache_Skips_A_Platform_That_Cannot_Be_Built;
+    //A skipped platform has no BOM, so once it can be built (the SDK was installed) the next restore builds it - and
+    //only it, the platforms that built last time have BOMs saying so.
+    [Test]
+    procedure Restore_Builds_A_Skipped_Platform_Once_It_Can_Be_Built;
+    //A package that uses FireMonkey isn't built for a platform FireMonkey isn't installed for (FMX for Linux is a
+    //GetIt package), nor is a package that needs it - the rest are, and it isn't a failure. Whether a package uses FMX
+    //comes from its spec (frameworks) or its project (requires fmx).
+    [Test]
+    procedure Restore_Skips_FMX_Packages_Where_FMX_Is_Not_Installed;
+    [Test]
+    procedure Restore_Finds_An_FMX_Package_From_Its_Project;
+    [Test]
+    procedure Restore_Finds_An_FMX_Package_From_Its_Dpk;
+    [Test]
+    procedure Restore_Ignores_FMX_In_A_Dpk_Comment;
+    [Test]
+    procedure Cache_Skips_An_FMX_Package_Where_FMX_Is_Not_Installed;
     //On Linux and macOS a package links against its dependencies' runtime packages (.so / .dylib), which are in their
     //bpl folders - not needed on Windows, where the .dcp in lib is linked against.
     [Test]
@@ -246,6 +271,10 @@ type
   protected
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
+    //false for UnbuildablePlatforms.
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    //false for NoFMXPlatforms.
+    function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
   public
     //the builds for failPlatforms fail whatever outcome says - a platform the machine can't build for.
     constructor Create(const logger : ILogger; const outcome : TCompileOutcome; const cancellation : ICancellationTokenSource;
@@ -336,6 +365,12 @@ var
   FailingBuilds : IList<string>;
   //every build's search paths, as '<platform> <project file>|<search paths, ; separated>' - when set.
   BuildSearchPaths : IList<string>;
+  //the platforms the fake compiler factory says this machine can't build (no compiler or SDK for them) - a test that
+  //sets it puts it back to [].
+  UnbuildablePlatforms : TDPMPlatforms;
+  //the platforms the fake compiler factory says FireMonkey isn't installed for (no FMX for Linux, say) - a test that
+  //sets it puts it back to [].
+  NoFMXPlatforms : TDPMPlatforms;
 
 const
   cPackageId = 'VSoft.Compiles';
@@ -601,6 +636,24 @@ end;
 function TFakeCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler;
 begin
   result := TFakeCompiler.Create(logger, OutcomeFor(platform), FCancellation, compilerVersion, platform);
+end;
+
+function TFakeCompilerFactory.CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  result := not (platform in UnbuildablePlatforms);
+  if result then
+    reason := ''
+  else
+    reason := 'its compiler is not installed (test)';
+end;
+
+function TFakeCompilerFactory.CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  result := not (platform in NoFMXPlatforms);
+  if result then
+    reason := ''
+  else
+    reason := 'FMX is not installed for it (test)';
 end;
 
 { TExtractedPackageCache }
@@ -1946,6 +1999,324 @@ begin
   Assert.AreEqual(1, loggerIntf.ErrorCount, 'the failed build, once : ' + logger.Messages.Text);
   Assert.IsTrue(ContainsText(logger.Messages.Text, 'failed on platforms [' + DPMPlatformToString(TDPMPlatform.Win32) + ']'),
                 'it says which platform didn''t build : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Install_Skips_A_Platform_That_Cannot_Be_Built;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+  context : IPackageInstallerContext;
+  installed : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  UnbuildablePlatforms := [TDPMPlatform.Win64];
+  try
+    installed := InstallIntoLockedProjectFor(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), TwoPlatformPackageSpec,
+                                             [TDPMPlatform.Win32, TDPMPlatform.Win64], [], projectText, context);
+  finally
+    UnbuildablePlatforms := [];
+  end;
+  Assert.IsTrue(installed, 'a platform that can''t be built is skipped, not a failure : ' + logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'Platform [win64] skipped - its compiler is not installed (test).'),
+                'it says the platform was skipped, and why : ' + logger.Messages.Text);
+  Assert.IsFalse(logger.Logged('warning', 'Platform [win64] skipped'), 'a skip is not a warning : ' + logger.Messages.Text);
+  Assert.IsTrue(WasBuilt(TDPMPlatform.Win32, 'VSoft.Baz'), 'Win32 was not built : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(TDPMPlatform.Win64, 'VSoft.Baz'), 'Win64 must not be tried : ' + ListText(BuiltProjects));
+  Assert.IsTrue(Pos('id="VSoft.Baz"', projectText) > 0, 'the package reference was not written : ' + projectText);
+  Assert.IsTrue(Pos('VSoft.Baz', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path was not written : ' + projectText);
+  Assert.AreEqual(0, Pos('VSoft.Baz', SearchPathFor(projectText, 'Win64')), 'the skipped platform''s search path must not change : ' + projectText);
+  Assert.IsTrue(context.AnyProjectCommitted, 'the project was saved');
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Skips_A_Platform_That_Cannot_Be_Built;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+  restored : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  UnbuildablePlatforms := [TDPMPlatform.Win64];
+  try
+    restored := RestoreLockedProjectFor(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')],
+                                        TwoPlatformPackageSpec, [TDPMPlatform.Win32, TDPMPlatform.Win64], [], projectText);
+  finally
+    UnbuildablePlatforms := [];
+  end;
+  Assert.IsTrue(restored, 'a platform that can''t be built is skipped, not a failure : ' + logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'Platform [win64] skipped'), 'it says the platform was skipped : ' + logger.Messages.Text);
+  Assert.IsFalse(ContainsText(logger.Messages.Text, 'Restore succeeded for ' + DPMPlatformToString(TDPMPlatform.Win64)),
+                 'a skipped platform was not restored : ' + logger.Messages.Text);
+  Assert.IsFalse(ContainsText(logger.Messages.Text, 'Restore failed'), logger.Messages.Text);
+  Assert.IsTrue(WasBuilt(TDPMPlatform.Win32, 'VSoft.Foo'), 'Win32 was not built : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(TDPMPlatform.Win64, 'VSoft.Foo'), 'Win64 must not be tried : ' + ListText(BuiltProjects));
+  Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path was not written : ' + projectText);
+  Assert.AreEqual(0, Pos('VSoft.Foo', SearchPathFor(projectText, 'Win64')), 'the skipped platform''s search path must not change : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Cache_Skips_A_Platform_That_Cannot_Be_Built;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  build : string;
+  builtWin32 : boolean;
+  builtWin64 : boolean;
+  cached : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  BuiltProjects := TCollections.CreateList<string>;
+  UnbuildablePlatforms := [TDPMPlatform.Win64];
+  try
+    cached := CachePackageSpec(FTempFolder, loggerIntf, coSucceed, TCancellationTokenSourceFactory.Create, TwoPlatformPackageSpec);
+  finally
+    UnbuildablePlatforms := [];
+  end;
+  Assert.IsTrue(cached, 'a platform that can''t be built is skipped, not a failure : ' + logger.Messages.Text);
+  builtWin32 := false;
+  builtWin64 := false;
+  for build in BuiltProjects do
+  begin
+    if StartsText(DPMPlatformToString(TDPMPlatform.Win32) + ' ', build) then
+      builtWin32 := true;
+    if StartsText(DPMPlatformToString(TDPMPlatform.Win64) + ' ', build) then
+      builtWin64 := true;
+  end;
+  Assert.IsTrue(builtWin32, 'Win32 was not built : ' + ListText(BuiltProjects));
+  Assert.IsFalse(builtWin64, 'Win64 must not be tried : ' + ListText(BuiltProjects));
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'Platform [win64] skipped'), 'it says the platform was skipped : ' + logger.Messages.Text);
+  Assert.IsFalse(ContainsText(logger.Messages.Text, 'failed on platforms'), logger.Messages.Text);
+end;
+
+//Restores projectFile with installer, for Win32 and Win64.
+function RestoreWith(const installer : IPackageInstaller; const projectFile : string; const context : IPackageInstallerContext) : boolean;
+var
+  options : TRestoreOptions;
+begin
+  options := TRestoreOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32, TDPMPlatform.Win64];
+    result := installer.Restore(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Builds_A_Skipped_Platform_Once_It_Can_Be_Built;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  projectText : string;
+  restored : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  installer := NewLockedFixture(FTempFolder, loggerIntf, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')],
+                                TwoPlatformPackageSpec, [], projectFile, context);
+  //Win64 can't be built here yet.
+  UnbuildablePlatforms := [TDPMPlatform.Win64];
+  try
+    restored := RestoreWith(installer, projectFile, context);
+  finally
+    UnbuildablePlatforms := [];
+  end;
+  Assert.IsTrue(restored, logger.Messages.Text);
+  Assert.IsFalse(WasBuilt(TDPMPlatform.Win64, 'VSoft.Foo'), ListText(BuiltProjects));
+  Assert.IsTrue(WasBuilt(TDPMPlatform.Win32, 'VSoft.Foo'), ListText(BuiltProjects));
+
+  //Now it can (its SDK was installed) - the next restore builds Win64.
+  BuiltProjects := TCollections.CreateList<string>;
+  Assert.IsTrue(RestoreWith(installer, projectFile, context), logger.Messages.Text);
+  Assert.IsTrue(WasBuilt(TDPMPlatform.Win64, 'VSoft.Foo'), 'the skipped platform is built once it can be : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(TDPMPlatform.Win32, 'VSoft.Foo'), 'Win32 was built last time - its BOM says so : ' + ListText(BuiltProjects));
+  projectText := TFile.ReadAllText(projectFile);
+  Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path is kept : ' + projectText);
+  Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win64')) > 0, 'the Win64 search path is written now : ' + projectText);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+end;
+
+//spec, saying the package uses the FMX framework.
+function FMXSpec(const spec : string) : string;
+begin
+  result := StringReplace(spec, '  license: Apache-2.0' + sLineBreak,
+                          '  license: Apache-2.0' + sLineBreak + '  frameworks:' + sLineBreak + '    - FMX' + sLineBreak, []);
+  Assert.AreNotEqual(spec, result, 'the spec has no license line to add the frameworks after');
+end;
+
+//The locked fixture for Win32 and Win64 - VSoft.Foo, which the project uses, needs VSoft.Bar, whose spec is barSpec.
+//barFolder is VSoft.Bar's folder in the 'cache'.
+function NewFMXFixture(const tempFolder : string; const logger : ILogger; const barSpec : string; out projectFile : string;
+                       out context : IPackageInstallerContext; out barFolder : string) : IPackageInstaller;
+var
+  overrides : IDictionary<string, string>;
+  repository : TFakeRepositoryManager;
+begin
+  overrides := TCollections.CreateDictionary<string, string>;
+  overrides['vsoft.bar'] := barSpec;
+  context := TFakeInstallerContext.Create(logger);
+  result := NewLockedFixtureWith(tempFolder, logger, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')],
+                                 TwoPlatformPackageSpec, overrides, [], [], context, projectFile, repository);
+  barFolder := TPath.Combine(TPath.Combine(tempFolder, 'locks'), 'VSoft.Bar');
+end;
+
+//Restores the fixture with FireMonkey not installed for Win64.
+function RestoreWithoutFMXForWin64(const installer : IPackageInstaller; const projectFile : string; const context : IPackageInstallerContext) : boolean;
+begin
+  NoFMXPlatforms := [TDPMPlatform.Win64];
+  try
+    result := RestoreWith(installer, projectFile, context);
+  finally
+    NoFMXPlatforms := [];
+  end;
+end;
+
+//VSoft.Bar uses FMX - so it, and VSoft.Foo which needs it, were built for Win32 but not Win64, it said so, and that
+//wasn't a failure.
+procedure CheckBarSkippedForWin64(const logger : TTestLogger; const restored : boolean; const projectFile : string);
+var
+  projectText : string;
+begin
+  Assert.IsTrue(restored, 'packages skipped for a platform are not a failure : ' + logger.Messages.Text);
+  Assert.AreEqual(0, logger.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'Package [VSoft.Bar] skipped for [win64] - it uses FMX, and FMX is not installed for it (test).'),
+                'it says Bar is skipped, and why : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'Package [VSoft.Foo] skipped for [win64] - it needs [VSoft.Bar], which is skipped.'),
+                'it says Foo is skipped, and why : ' + logger.Messages.Text);
+  Assert.IsTrue(WasBuilt(TDPMPlatform.Win32, 'VSoft.Bar') and WasBuilt(TDPMPlatform.Win32, 'VSoft.Foo'),
+                'Win32 has FMX - both are built for it : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(TDPMPlatform.Win64, 'VSoft.Bar'), 'Bar uses FMX : ' + ListText(BuiltProjects));
+  Assert.IsFalse(WasBuilt(TDPMPlatform.Win64, 'VSoft.Foo'), 'Foo needs Bar : ' + ListText(BuiltProjects));
+  projectText := TFile.ReadAllText(projectFile);
+  Assert.IsTrue(Pos('VSoft.Foo', SearchPathFor(projectText, 'Win32')) > 0, 'the Win32 search path was not written : ' + projectText);
+  Assert.AreEqual(0, Pos('VSoft.', SearchPathFor(projectText, 'Win64')), 'nothing was built for Win64 - nothing on its search path : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Skips_FMX_Packages_Where_FMX_Is_Not_Installed;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  barFolder : string;
+  restored : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  installer := NewFMXFixture(FTempFolder, loggerIntf, FMXSpec(TwoPlatformPackageSpec), projectFile, context, barFolder);
+  restored := RestoreWithoutFMXForWin64(installer, projectFile, context);
+  CheckBarSkippedForWin64(logger, restored, projectFile);
+  Assert.IsTrue(logger.Logged('information', 'Platform [win64] skipped - none of its packages can be built for it'), logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Finds_An_FMX_Package_From_Its_Project;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  barFolder : string;
+  restored : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //nothing in its spec says so - its project requires fmx.
+  installer := NewFMXFixture(FTempFolder, loggerIntf, TwoPlatformPackageSpec, projectFile, context, barFolder);
+  TFile.WriteAllText(TPath.Combine(barFolder, 'source\Pkg.dproj'),
+    StringReplace(cPackageProject, '    <Import Project=',
+      '    <ItemGroup>' + sLineBreak + '        <DCCReference Include="fmx.dcp"/>' + sLineBreak + '    </ItemGroup>' + sLineBreak +
+      '    <Import Project=', []), TEncoding.UTF8);
+  restored := RestoreWithoutFMXForWin64(installer, projectFile, context);
+  CheckBarSkippedForWin64(logger, restored, projectFile);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Finds_An_FMX_Package_From_Its_Dpk;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  barFolder : string;
+  restored : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  installer := NewFMXFixture(FTempFolder, loggerIntf, TwoPlatformPackageSpec, projectFile, context, barFolder);
+  TFile.WriteAllText(TPath.Combine(barFolder, 'source\Pkg.dpk'),
+    'package Pkg;' + sLineBreak + sLineBreak + '{$R *.res}' + sLineBreak + sLineBreak +
+    'requires' + sLineBreak + '  rtl,' + sLineBreak + '  {$IFDEF MSWINDOWS} vcl, {$ENDIF}' + sLineBreak + '  FMX;' + sLineBreak + sLineBreak +
+    'contains' + sLineBreak + '  Bar.Unit1 in ''Bar.Unit1.pas'';' + sLineBreak + sLineBreak + 'end.' + sLineBreak, TEncoding.UTF8);
+  restored := RestoreWithoutFMXForWin64(installer, projectFile, context);
+  CheckBarSkippedForWin64(logger, restored, projectFile);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Ignores_FMX_In_A_Dpk_Comment;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+  barFolder : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  installer := NewFMXFixture(FTempFolder, loggerIntf, TwoPlatformPackageSpec, projectFile, context, barFolder);
+  TFile.WriteAllText(TPath.Combine(barFolder, 'source\Pkg.dpk'),
+    'package Pkg;' + sLineBreak + '// requires fmx;' + sLineBreak + sLineBreak +
+    'requires' + sLineBreak + '  rtl {, fmx}' + sLineBreak + '  (* , fmx *);' + sLineBreak + sLineBreak + 'end.' + sLineBreak, TEncoding.UTF8);
+  Assert.IsTrue(RestoreWithoutFMXForWin64(installer, projectFile, context), logger.Messages.Text);
+  Assert.IsFalse(logger.Logged('information', 'skipped for [win64]'), 'fmx is only in comments - Bar doesn''t use it : ' + logger.Messages.Text);
+  Assert.IsTrue(WasBuilt(TDPMPlatform.Win64, 'VSoft.Bar') and WasBuilt(TDPMPlatform.Win64, 'VSoft.Foo'), ListText(BuiltProjects));
+end;
+
+procedure TInstallerDiagnosticsTests.Cache_Skips_An_FMX_Package_Where_FMX_Is_Not_Installed;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  build : string;
+  builtWin32 : boolean;
+  builtWin64 : boolean;
+  cached : boolean;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  BuiltProjects := TCollections.CreateList<string>;
+  NoFMXPlatforms := [TDPMPlatform.Win64];
+  try
+    cached := CachePackageSpec(FTempFolder, loggerIntf, coSucceed, TCancellationTokenSourceFactory.Create, FMXSpec(TwoPlatformPackageSpec));
+  finally
+    NoFMXPlatforms := [];
+  end;
+  Assert.IsTrue(cached, 'a package skipped for a platform is not a failure : ' + logger.Messages.Text);
+  builtWin32 := false;
+  builtWin64 := false;
+  for build in BuiltProjects do
+  begin
+    if StartsText(DPMPlatformToString(TDPMPlatform.Win32) + ' ', build) then
+      builtWin32 := true;
+    if StartsText(DPMPlatformToString(TDPMPlatform.Win64) + ' ', build) then
+      builtWin64 := true;
+  end;
+  Assert.IsTrue(builtWin32, 'Win32 has FMX : ' + ListText(BuiltProjects));
+  Assert.IsFalse(builtWin64, 'Win64 has no FMX : ' + ListText(BuiltProjects));
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'Package [' + cPackageId + '] skipped for [win64] - it uses FMX'), logger.Messages.Text);
+  Assert.IsFalse(ContainsText(logger.Messages.Text, 'failed on platforms'), logger.Messages.Text);
 end;
 
 //The search paths package id's build for platform was given (see BuildSearchPaths) - fails when it wasn't built.

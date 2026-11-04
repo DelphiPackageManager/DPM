@@ -136,7 +136,8 @@ begin
   //we are about to pass to msbuild.
   Container.RegisterType<IProjectConfigPatcher, TProjectConfigPatcher>;
 
-  Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>;
+  //a singleton - it remembers what it found out about the installed compilers (and the platforms they can build).
+  Container.RegisterType<ICompilerEnvironmentProvider, TCompilerEnvironmentProvider>().AsSingleton();
   Container.RegisterType<ICompilerFactory, TCompilerFactory>().AsSingleton();
 
   // Register the core default. The IDE plugin replaces this via overrideProc

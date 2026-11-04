@@ -44,6 +44,8 @@ type
   protected
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
   public
     constructor Create(const logger : ILogger; const env : ICompilerEnvironmentProvider; const packageCache : IPackageCache);
   end;
@@ -54,6 +56,16 @@ uses
   DPM.Core.Compiler.MSBuild;
 
 { TCompilerFactory }
+
+function TCompilerFactory.CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  result := FEnv.CanBuildPlatform(compilerVersion, platform, reason);
+end;
+
+function TCompilerFactory.CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  result := FEnv.CanBuildFMX(compilerVersion, platform, reason);
+end;
 
 constructor TCompilerFactory.Create(const logger : ILogger; const env : ICompilerEnvironmentProvider; const packageCache : IPackageCache);
 begin

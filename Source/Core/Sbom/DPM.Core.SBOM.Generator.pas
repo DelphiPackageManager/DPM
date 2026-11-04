@@ -156,15 +156,6 @@ function GetOutputFileCandidates(const dprojDir, outputDir, fileName, configName
 function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName : string;
                               const platform : TDPMPlatform) : TArray<string>;
 
-//Expands the MSBuild macros of an IDE Library Path (or project search path) value - the IDE's own (BDSLIB, BDS,
-//BDSCOMMONDIR, BDSCatalogRepository, ...) and the user's Environment Variables overrides (name -> value), which
-//win as they do in the IDE - and then any %VARIABLE%. Exposed so it can be unit tested.
-function ExpandBDSTokens(const value, delphiRoot : string; const platform : TDPMPlatform; const bdsVersion : string;
-                         const overrides : IDictionary<string, string> = nil) : string;
-
-//The IDE's Environment Variables overrides for bdsVersion (HKCU), name -> value - empty when there are none.
-function ReadIDEEnvironmentOverrides(const bdsVersion : string) : IDictionary<string, string>;
-
 implementation
 
 uses
@@ -183,6 +174,7 @@ uses
   DPM.Core.Project.Editor,
   DPM.Core.Project.GroupProjReader,
   DPM.Core.Compiler.ProjectSettings,
+  DPM.Core.Compiler.EnvironmentProvider,
   DPM.Core.Spec.Interfaces,
   DPM.Core.Dependency.Version,
   DPM.Core.Utils.Path,
@@ -284,91 +276,6 @@ function GetMapFileCandidates(const dprojDir, outputDir, projectName, configName
                               const platform : TDPMPlatform) : TArray<string>;
 begin
   result := GetOutputFileCandidates(dprojDir, outputDir, projectName + '.map', configName, platform);
-end;
-
-//Expand the BDS-family MSBuild macros that show up in IDE Library Path values
-//('$(BDSLIB)\$(PLATFORM)\release' is the canonical Win32/Win64 entry).
-//Without this expansion the registry-derived paths point at literal "$(BDSLIB)\..."
-//directories that don't exist, the search index can't scan them, and we lose every
-//IDE-installed third-party library as a source of unit-name evidence.
-function ExpandBDSTokens(const value, delphiRoot : string; const platform : TDPMPlatform; const bdsVersion : string;
-                         const overrides : IDictionary<string, string>) : string;
-
-  //as long as the value is - a fixed 1024 char buffer left a long library path unexpanded.
-  function ExpandEnv(const s : string) : string;
-  begin
-    if Pos('%', s) = 0 then
-      exit(s);
-    result := TSystemUtils.ExpandEnvironmentStrings(s);
-    if result = '' then
-      result := s;
-  end;
-
-var
-  s : string;
-  publicDocs : string;
-  userDocs : string;
-  pair : TPair<string, string>;
-begin
-  s := value;
-  //the user's overrides first - an override of one of the IDE's own (BDSCOMMONDIR, say) is the value the IDE uses.
-  if overrides <> nil then
-  begin
-    for pair in overrides do
-      s := StringReplace(s, '$(' + pair.Key + ')', pair.Value, [rfReplaceAll, rfIgnoreCase]);
-  end;
-  if delphiRoot <> '' then
-  begin
-    s := StringReplace(s, '$(BDSLIB)', IncludeTrailingPathDelimiter(delphiRoot) + 'lib', [rfReplaceAll, rfIgnoreCase]);
-    s := StringReplace(s, '$(BDSBIN)', IncludeTrailingPathDelimiter(delphiRoot) + 'bin', [rfReplaceAll, rfIgnoreCase]);
-    s := StringReplace(s, '$(BDSINCLUDE)', IncludeTrailingPathDelimiter(delphiRoot) + 'include', [rfReplaceAll, rfIgnoreCase]);
-    s := StringReplace(s, '$(BDS)', delphiRoot, [rfReplaceAll, rfIgnoreCase]);
-  end;
-  if bdsVersion <> '' then
-  begin
-    publicDocs := ExpandEnv('%PUBLIC%\Documents\Embarcadero\Studio\' + bdsVersion);
-    userDocs := ExpandEnv('%USERPROFILE%\Documents\Embarcadero\Studio\' + bdsVersion);
-    s := StringReplace(s, '$(BDSCOMMONDIR)', publicDocs, [rfReplaceAll, rfIgnoreCase]);
-    s := StringReplace(s, '$(BDSUSERDIR)', userDocs, [rfReplaceAll, rfIgnoreCase]);
-    s := StringReplace(s, '$(BDSPROJECTSDIR)', IncludeTrailingPathDelimiter(userDocs) + 'Projects', [rfReplaceAll, rfIgnoreCase]);
-    //where GetIt puts what it installs - the library paths of those packages are under it.
-    s := StringReplace(s, '$(BDSCatalogRepositoryAllUsers)', IncludeTrailingPathDelimiter(publicDocs) + 'CatalogRepository', [rfReplaceAll, rfIgnoreCase]);
-    s := StringReplace(s, '$(BDSCatalogRepository)', IncludeTrailingPathDelimiter(userDocs) + 'CatalogRepository', [rfReplaceAll, rfIgnoreCase]);
-  end;
-  //$(PLATFORM) - uppercase variant the IDE uses in Library Path entries (the project uses $(Platform))
-  s := StringReplace(s, '$(PLATFORM)', DPMPlatformToBDString(platform), [rfReplaceAll, rfIgnoreCase]);
-  //Generic environment-variable expansion catches anything else (e.g. %ProgramFiles%)
-  result := ExpandEnv(s);
-end;
-
-function ReadIDEEnvironmentOverrides(const bdsVersion : string) : IDictionary<string, string>;
-var
-  reg : TRegistry;
-  names : TStringList;
-  i : integer;
-begin
-  result := TCollections.CreateDictionary<string, string>;
-  if bdsVersion = '' then
-    exit;
-  reg := TRegistry.Create(KEY_READ);
-  names := TStringList.Create;
-  try
-    reg.RootKey := HKEY_CURRENT_USER;
-    if not reg.OpenKeyReadOnly('Software\Embarcadero\BDS\' + bdsVersion + '\Environment Variables') then
-      exit;
-    reg.GetValueNames(names);
-    for i := 0 to names.Count - 1 do
-    begin
-      try
-        result[names[i]] := reg.ReadString(names[i]);
-      except
-        //not a string - the IDE only writes strings here.
-      end;
-    end;
-  finally
-    names.Free;
-    reg.Free;
-  end;
 end;
 
 function ResolveAgainstDproj(const dprojPath, relativeOrAbsolute : string) : string;
@@ -632,8 +539,6 @@ function TSBOMGenerator.GetIDELibraryPath(const compilerVersion : TCompilerVersi
                                           const platform : TDPMPlatform) : string;
 var
   bdsVersion : string;
-  key : string;
-  reg : TRegistry;
 begin
   result := '';
   if compilerVersion = TCompilerVersion.UnknownVersion then
@@ -643,23 +548,7 @@ begin
   except
     exit;
   end;
-  //IDE Library Path is per-platform, under HKCU\Software\Embarcadero\BDS\{bdsVer}\Library\{Platform}.
-  //The value name is literally "Search Path" (with a space). Semicolon-separated.
-  key := Format('Software\Embarcadero\BDS\%s\Library\%s', [bdsVersion, DPMPlatformToBDString(platform)]);
-  reg := TRegistry.Create(KEY_READ);
-  try
-    reg.RootKey := HKEY_CURRENT_USER;
-    if reg.OpenKeyReadOnly(key) then
-    begin
-      try
-        result := reg.ReadString('Search Path');
-      except
-        result := '';
-      end;
-    end;
-  finally
-    reg.Free;
-  end;
+  result := ReadIDELibraryPath(bdsVersion, platform);
 end;
 
 //What the project stamps into its binary's version resource for one (config, platform) - the

@@ -56,6 +56,8 @@ type
     function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
     function GetRootDir(const compilerVersion : TCompilerVersion) : string;
     function GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
   public
     constructor Create(const root, rsVars, msBuild : string);
   end;
@@ -84,6 +86,18 @@ end;
 function TFakeEnvironment.GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
 begin
   result := FMSBuild;
+end;
+
+function TFakeEnvironment.CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  reason := '';
+  result := true;
+end;
+
+function TFakeEnvironment.CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  reason := '';
+  result := true;
 end;
 
 const

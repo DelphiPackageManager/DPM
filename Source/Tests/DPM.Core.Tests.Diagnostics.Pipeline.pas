@@ -122,6 +122,8 @@ type
     function GetRsVarsFilePath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
     function GetRootDir(const compilerVersion : TCompilerVersion) : string;
     function GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
   end;
 
   //A package source that either answers, or fails with a given reason.
@@ -167,6 +169,20 @@ end;
 function TMissingCompilerEnvironment.GetRootDir(const compilerVersion : TCompilerVersion) : string;
 begin
   result := GetRsVarsFilePath(TDPMPlatform.Win32, compilerVersion);
+end;
+
+function TMissingCompilerEnvironment.CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  //not answered for a compiler that isn't installed - the build reports it.
+  reason := '';
+  result := true;
+end;
+
+function TMissingCompilerEnvironment.CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+begin
+  //not answered for a compiler that isn't installed - the build reports it.
+  reason := '';
+  result := true;
 end;
 
 function TMissingCompilerEnvironment.GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;

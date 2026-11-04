@@ -303,6 +303,7 @@ uses
   DPM.Core.SBOM.Writers,
   DPM.Core.SBOM.Writers.Reports,
   DPM.Core.SBOM.Generator,
+  DPM.Core.Compiler.EnvironmentProvider,
   DPM.Core.Tests.Utils.PEImports,
   DPM.Core.Diagnostics;
 

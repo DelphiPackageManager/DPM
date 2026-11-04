@@ -340,6 +340,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Repository.Http.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Sources.Manager.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Compiler.MSBuild.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.Compiler.PlatformDetection.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PE.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Crypto.Algorithms.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Package.Archive.pas"/>

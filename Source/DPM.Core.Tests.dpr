@@ -263,6 +263,7 @@ uses
   DPM.Core.Tests.Repository.Http in 'Tests\DPM.Core.Tests.Repository.Http.pas',
   DPM.Core.Tests.Sources.Manager in 'Tests\DPM.Core.Tests.Sources.Manager.pas',
   DPM.Core.Tests.Compiler.MSBuild in 'Tests\DPM.Core.Tests.Compiler.MSBuild.pas',
+  DPM.Core.Tests.Compiler.PlatformDetection in 'Tests\DPM.Core.Tests.Compiler.PlatformDetection.pas',
   DPM.Core.Tests.Utils.PE in 'Tests\DPM.Core.Tests.Utils.PE.pas',
   DPM.Core.Tests.Crypto.Algorithms in 'Tests\DPM.Core.Tests.Crypto.Algorithms.pas',
   DPM.Core.Tests.Package.Archive in 'Tests\DPM.Core.Tests.Package.Archive.pas',

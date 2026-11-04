@@ -83,6 +83,14 @@ type
     function GetRootDir(const compilerVersion : TCompilerVersion) : string;
     //MSBuild.exe by its full path - the one the compiler's rsvars.bat puts first on the PATH (its FrameworkDir).
     function GetMSBuildPath(const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : string;
+    //Whether this machine can build for platform - its compiler and runtime library are installed, and so is any
+    //platform SDK the build needs. reason says why not. A compiler version that isn't installed at all is not
+    //answered here (true) - the build reports that (E5001).
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    //Whether FireMonkey packages can be built for platform - FireMonkey's runtime package (fmx.dcp) is installed for it,
+    //which for Linux64 takes FMX for Linux, a GetIt package. reason says why not. A compiler version that isn't
+    //installed at all is not answered here (true).
+    function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
   end;
 
   //inject
@@ -92,6 +100,10 @@ type
     //a compiler that reports through logger rather than the shared one - eg a TDemotingLogger for a
     //build whose failure is not the operation's.
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
+    //Whether this machine can build for platform - see ICompilerEnvironmentProvider.CanBuildPlatform.
+    function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    //Whether FireMonkey packages can be built for platform - see ICompilerEnvironmentProvider.CanBuildFMX.
+    function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
   end;
 
 implementation
