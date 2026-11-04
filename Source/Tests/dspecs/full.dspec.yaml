@@ -36,7 +36,7 @@ templates:
   - name: default
     dependencies:
       - id: VSoft.SemanticVersion
-        version: "[1.0.0,2.0.0]"
+        version: "[1.0.0,1.0.9]"
       - id: VSoft.CommandLine
         version: "[0.1.0,)"
     source:

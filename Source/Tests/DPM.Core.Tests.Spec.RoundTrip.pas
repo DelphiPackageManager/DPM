@@ -119,6 +119,9 @@ begin
   reader := TPackageSpecReader.Create(TTestLogger.Create);
   result := reader.ReadSpec(dir + name);
   Assert.IsNotNull(result, 'failed to load fixture ' + name);
+  //the round trip compares what was read, so an invalid fixture (e.g. a version range DPM rejects) would
+  //still pass - the fixtures double as examples, so they must be valid specs.
+  Assert.IsTrue(result.IsValid, 'fixture is not valid: ' + name);
 end;
 
 function RoundTrip(const spec : IPackageSpec) : IPackageSpec;
