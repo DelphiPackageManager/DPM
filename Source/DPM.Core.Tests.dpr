@@ -222,6 +222,7 @@ uses
   DPM.Core.Tests.Utils.PEImports in 'Tests\DPM.Core.Tests.Utils.PEImports.pas',
   DPM.Core.Tests.Sbom.Writers in 'Tests\DPM.Core.Tests.Sbom.Writers.pas',
   DPM.Core.Tests.SBOM.ComponentRules in 'Tests\DPM.Core.Tests.SBOM.ComponentRules.pas',
+  DPM.Core.Tests.SBOM.Sidecar in 'Tests\DPM.Core.Tests.SBOM.Sidecar.pas',
   DPM.Core.Tests.SBOM.Generator in 'Tests\DPM.Core.Tests.SBOM.Generator.pas',
   DPM.Core.Tests.Spec.Reader in 'Tests\DPM.Core.Tests.Spec.Reader.pas',
   DPM.Core.Tests.Spec.Collapse in 'Tests\DPM.Core.Tests.Spec.Collapse.pas',

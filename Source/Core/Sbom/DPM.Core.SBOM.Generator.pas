@@ -91,6 +91,7 @@ type
     FMapFileRead : boolean;
   protected
     function Generate(const cancellationToken : ICancellationToken; const options : TSBOMOptions) : boolean;
+    function GetVersionInfoDefaults(const options : TSBOMOptions) : TSBOMProductInfo;
     function GenerateForProject(const cancellationToken : ICancellationToken; const projectPath : string; const options : TSBOMOptions;
                                 const config : IConfiguration) : boolean;
     function GenerateForPlatform(const cancellationToken : ICancellationToken; const editor : IProjectEditor;
@@ -119,7 +120,8 @@ type
     function BuildSearchIndex(const editor : IProjectEditor; const dprojDir, configName : string;
                               const platform : TDPMPlatform; const compilerVersion : TCompilerVersion) : IUnitSearchIndex;
     function GetIDELibraryPath(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : string;
-    function GetVersionInfo(const projectPath, configName : string; const platform : TDPMPlatform) : TSBOMProductInfo;
+    function GetVersionInfo(const logger : ILogger; const projectPath, configName : string; const platform : TDPMPlatform) : TSBOMProductInfo;
+    function PickConfig(const names : IReadOnlyList<string>; const requested : string; out requestedMissing : boolean) : string;
     function LoadExplicitProductInfo(const projectPath : string; const options : TSBOMOptions; out info : TSBOMProductInfo;
                                      out rules : ISBOMComponentRules) : boolean;
     function FindOrCreateRuleComponent(const report : TSBOMReport; const parentBomRef : string;
@@ -556,7 +558,7 @@ end;
 //FileVersion; not the dproj's ProjectVersion element, which is the MSBuild project format version.
 //Supplier is CompanyName. Empty when the project doesn't include version info, since the dproj's
 //values then describe nothing that ships.
-function TSBOMGenerator.GetVersionInfo(const projectPath, configName : string; const platform : TDPMPlatform) : TSBOMProductInfo;
+function TSBOMGenerator.GetVersionInfo(const logger : ILogger; const projectPath, configName : string; const platform : TDPMPlatform) : TSBOMProductInfo;
 var
   loader : IProjectSettingsLoader;
   keys : string;
@@ -567,14 +569,14 @@ begin
   result.License := '';
   result.SbomCreator := '';
   try
-    loader := TDPMProjectSettingsLoader.Create(FLogger, projectPath, configName, platform);
+    loader := TDPMProjectSettingsLoader.Create(logger, projectPath, configName, platform);
     if not SameText(loader.GetStringProperty('VerInfo_IncludeVerInfo', ''), 'true') then
       exit;
     keys := loader.GetStringProperty('VerInfo_Keys', '');
   except
     on e : Exception do
     begin
-      FLogger.Warning(TWarningCode.W8109_ProjectSettingsUnreadable, '[SBOM] could not read the project version info : ' + e.Message);
+      logger.Warning(TWarningCode.W8109_ProjectSettingsUnreadable, '[SBOM] could not read the project version info : ' + e.Message);
       exit;
     end;
   end;
@@ -1186,6 +1188,81 @@ begin
   end;
 end;
 
+//The configuration Generate reads : the one asked for when the project has it, else Release, then
+//Debug, then the first, and Release when the project lists none. requestedMissing is true when a
+//configuration was asked for that the project doesn't have - the caller decides whether that is
+//worth a warning.
+function TSBOMGenerator.PickConfig(const names : IReadOnlyList<string>; const requested : string; out requestedMissing : boolean) : string;
+var
+  name : string;
+begin
+  result := '';
+  requestedMissing := false;
+  if requested <> '' then
+  begin
+    for name in names do
+      if SameText(name, requested) then
+        exit(name);
+    requestedMissing := true;
+  end;
+  for name in names do
+    if SameText(name, 'Release') then
+      exit(name);
+  for name in names do
+    if SameText(name, 'Debug') then
+      exit(name);
+  if names.Count > 0 then
+    result := names[0]
+  else
+    result := 'Release';
+end;
+
+function TSBOMGenerator.GetVersionInfoDefaults(const options : TSBOMOptions) : TSBOMProductInfo;
+var
+  quietLogger : ILogger;
+  projPath : string;
+  editor : IProjectEditor;
+  candidate : TDPMPlatform;
+  platform : TDPMPlatform;
+  found : boolean;
+  configName : string;
+  configMissing : boolean;
+begin
+  result.Version := '';
+  result.Supplier := '';
+  result.SupplierUrl := '';
+  result.License := '';
+  result.SbomCreator := '';
+  if options = nil then
+    exit;
+
+  //a group's root is the group itself, which has no version info of its own
+  projPath := TPathUtils.ToAbsolutePath(options.ProjectPath);
+  if not SameText(ExtractFileExt(projPath), '.dproj') or not FileExists(projPath) then
+    exit;
+
+  //only a hint - anything that goes wrong reading it is Generate's to report, if it matters there
+  quietLogger := TDemotingLogger.Create(FLogger);
+  editor := TProjectEditor.Create(quietLogger, nil, TCompilerVersion.UnknownVersion);
+  if not editor.LoadProject(projPath, [TProjectElement.Platforms, TProjectElement.Configs]) then
+    exit;
+
+  found := false;
+  platform := TDPMPlatform.UnknownPlatform;
+  for candidate := Low(TDPMPlatform) to High(TDPMPlatform) do
+    if candidate in editor.Platforms then
+    begin
+      platform := candidate;
+      found := true;
+      break;
+    end;
+  if not found then
+    exit;
+
+  configName := PickConfig(editor.GetConfigNames, options.Config, configMissing);
+  result := GetVersionInfo(quietLogger, projPath, configName, platform);
+end;
+
 function TSBOMGenerator.GenerateForProject(const cancellationToken : ICancellationToken; const projectPath : string; const options : TSBOMOptions;
                                           const config : IConfiguration) : boolean;
 var
@@ -1202,38 +1279,7 @@ var
   explicitInfo : TSBOMProductInfo;
   rules : ISBOMComponentRules;
   ok : boolean;
-
-  function PickConfig : string;
-  var
-    name : string;
-  begin
-    result := '';
-    if options.Config <> '' then
-    begin
-      for name in configNames do
-        if SameText(name, options.Config) then
-        begin
-          result := name;
-          exit;
-        end;
-      FLogger.Warning(TWarningCode.W8110_BuildConfigNotFound, 'The configuration [' + options.Config + '] is not in the project - using the first available.');
-    end;
-    for name in configNames do
-      if SameText(name, 'Release') then
-      begin
-        result := name;
-        exit;
-      end;
-    for name in configNames do
-      if SameText(name, 'Debug') then
-      begin
-        result := name;
-        exit;
-      end;
-    if configNames.Count > 0 then
-      result := configNames[0];
-  end;
-
+  configMissing : boolean;
 begin
   result := false;
   FLogger.Information('Generating SBOM for project : ' + projectPath);
@@ -1275,9 +1321,9 @@ begin
   end;
 
   configNames := editor.GetConfigNames;
-  configName := PickConfig;
-  if configName = '' then
-    configName := 'Release';
+  configName := PickConfig(configNames, options.Config, configMissing);
+  if configMissing then
+    FLogger.Warning(TWarningCode.W8110_BuildConfigNotFound, 'The configuration [' + options.Config + '] is not in the project - using the first available.');
 
   //--outdir is user supplied, so it gets the same treatment as the project path. A relative
   //outdir resolves against the current directory, not the project directory.
@@ -1342,28 +1388,7 @@ var
   editor : IProjectEditor;
   loadFailed : boolean;
   platformFailed : boolean;
-
-  function PickConfig(const names : IReadOnlyList<string>) : string;
-  var
-    name : string;
-  begin
-    result := '';
-    if options.Config <> '' then
-    begin
-      for name in names do
-        if SameText(name, options.Config) then
-          exit(name);
-    end;
-    for name in names do
-      if SameText(name, 'Release') then
-        exit(name);
-    for name in names do
-      if SameText(name, 'Debug') then
-        exit(name);
-    if names.Count > 0 then
-      result := names[0];
-  end;
-
+  configMissing : boolean;
 begin
   result := false;
   if Length(dprojPaths) = 0 then
@@ -1411,9 +1436,8 @@ begin
       contexts[i].CompilerVersion := ProjectVersionToCompilerVersion(contexts[i].Editor.ProjectVersion);
     contexts[i].EnabledPlatforms := contexts[i].Editor.Platforms;
     contexts[i].ConfigNames := contexts[i].Editor.GetConfigNames;
-    contexts[i].ConfigName := PickConfig(contexts[i].ConfigNames);
-    if contexts[i].ConfigName = '' then
-      contexts[i].ConfigName := 'Release';
+    //a group's projects needn't share configuration names, so a missing one isn't worth a warning
+    contexts[i].ConfigName := PickConfig(contexts[i].ConfigNames, options.Config, configMissing);
     contexts[i].GraphRoot := contexts[i].Editor.GetPackageReferences;
     contexts[i].Rules := TSBOMComponentRules.Create;
     if not LoadSBOMSidecar(FLogger, dprojPaths[i], contexts[i].Sidecar, contexts[i].Rules) then
@@ -1522,7 +1546,7 @@ begin
         dprojApp.Id := ctx.Name;
         //as for a single dproj's root - runtime loads by name can't be seen
         dprojApp.DependencyCompleteness := TSBOMCompleteness.Incomplete;
-        ApplyProductInfo(dprojApp, ctx.Sidecar.Merge(groupFallback).Merge(GetVersionInfo(ctx.Path, ctx.ConfigName, platform)));
+        ApplyProductInfo(dprojApp, ctx.Sidecar.Merge(groupFallback).Merge(GetVersionInfo(FLogger, ctx.Path, ctx.ConfigName, platform)));
         binaryPath := ApplyBuiltBinary(report, dprojApp, ctx.Editor, ctx.Path, ctx.ConfigName, platform, ctx.CompilerVersion);
         report.AddRelationship(report.RootComponent.BomRef, ctx.AppBomRef);
         contexts[i].AppBomRef := ctx.AppBomRef;
@@ -1608,7 +1632,7 @@ var
   binaryPath : string;
 begin
   //version info is per (config, platform) - Win32 and Win64 builds can carry different versions
-  productInfo := explicitInfo.Merge(GetVersionInfo(projectPath, configName, platform));
+  productInfo := explicitInfo.Merge(GetVersionInfo(FLogger, projectPath, configName, platform));
   report := TSBOMReport.Create;
   try
     report.SerialNumber := 'urn:uuid:' + NewGuidString;

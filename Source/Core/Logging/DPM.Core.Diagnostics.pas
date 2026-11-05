@@ -164,7 +164,8 @@ type
     E8102_SBOMProductInfoUnreadable,
     E8112_PackageEnumerationFailed,
     E8113_MapFileRequired,
-    E8115_SBOMWriteFailed
+    E8115_SBOMWriteFailed,
+    E8117_SBOMProductInfoWriteFailed
   );
 
   //Every warning DPM reports - the same rules as TErrorCode.
@@ -367,7 +368,8 @@ const
     (Number : 8102; Title : 'The SBOM product information file could not be read'),
     (Number : 8112; Title : 'Unable to list the packages for the SBOM'),
     (Number : 8113; Title : 'The MAP file is required and could not be read'),
-    (Number : 8115; Title : 'Unable to write the SBOM')
+    (Number : 8115; Title : 'Unable to write the SBOM'),
+    (Number : 8117; Title : 'The SBOM product information file could not be written')
   );
 
   cWarningInfo : array[TWarningCode] of TDiagnosticInfo = (

@@ -114,6 +114,8 @@ function StringToSBOMFormat(const value : string) : TSBOMFormat;
 //the default ([CycloneDX]).
 function StringToSBOMFormats(const value : string) : TSBOMFormats;
 function SBOMFormatToString(const value : TSBOMFormat) : string;
+//The comma-separated tokens StringToSBOMFormats reads back, in declaration order. '' for no formats.
+function SBOMFormatsToString(const value : TSBOMFormats) : string;
 
 implementation
 
@@ -191,6 +193,21 @@ begin
     TSBOMFormat.Markdown : result := 'markdown';
   else
     result := '';
+  end;
+end;
+
+function SBOMFormatsToString(const value : TSBOMFormats) : string;
+var
+  format : TSBOMFormat;
+begin
+  result := '';
+  for format := Low(TSBOMFormat) to High(TSBOMFormat) do
+  begin
+    if not (format in value) then
+      continue;
+    if result <> '' then
+      result := result + ',';
+    result := result + SBOMFormatToString(format);
   end;
 end;
 

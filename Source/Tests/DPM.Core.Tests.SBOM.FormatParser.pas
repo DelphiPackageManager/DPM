@@ -27,6 +27,10 @@ type
     procedure UnknownTokenRaises;
     [Test]
     procedure CaseInsensitive;
+    [Test]
+    procedure FormatsToString_ListsEachFormatInOrder;
+    [Test]
+    procedure FormatsToString_RoundTripsThroughTheParser;
   end;
 
 implementation
@@ -34,6 +38,20 @@ implementation
 uses
   System.SysUtils,
   DPM.Core.Options.SBOM;
+
+procedure TSBOMFormatParserTests.FormatsToString_ListsEachFormatInOrder;
+begin
+  Assert.AreEqual('cyclonedx,html,markdown',
+                  SBOMFormatsToString([TSBOMFormat.Markdown, TSBOMFormat.CycloneDX, TSBOMFormat.HTML]), false);
+  Assert.AreEqual('spdx', SBOMFormatsToString([TSBOMFormat.SPDX]), false);
+end;
+
+procedure TSBOMFormatParserTests.FormatsToString_RoundTripsThroughTheParser;
+begin
+  Assert.IsTrue(StringToSBOMFormats(SBOMFormatsToString(cAllSBOMFormats)) = cAllSBOMFormats);
+  Assert.IsTrue(StringToSBOMFormats(SBOMFormatsToString([TSBOMFormat.SPDX, TSBOMFormat.HTML])) =
+                [TSBOMFormat.SPDX, TSBOMFormat.HTML]);
+end;
 
 procedure TSBOMFormatParserTests.SingleTokenCycloneDX;
 var

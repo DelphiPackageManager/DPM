@@ -6,6 +6,7 @@ uses
   JsonDataObjects,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Options.SBOM,
   //for TDPMUpdateChannel - already used by the implementation section.
   DPM.IDE.Types;
 
@@ -49,6 +50,9 @@ type
     function GetUpdateChannel : TDPMUpdateChannel;
     procedure SetUpdateChannel(const value : TDPMUpdateChannel);
 
+    function GetSBOMFormats : TSBOMFormats;
+    procedure SetSBOMFormats(const value : TSBOMFormats);
+
     property LogVerbosity : TVerbosity read GetLogVerbosity write SetLogVebosity;
     property LogWindowWidth : integer read GetLogWindowWidth write SetLogWindowWidth;
     property LogWindowHeight : integer read GetLogWindowHeight write SetLogWindowHeight;
@@ -68,6 +72,11 @@ type
     /// </summary>
     property UpdateChannel : TDPMUpdateChannel read GetUpdateChannel write SetUpdateChannel;
 
+    /// <summary>
+    ///  The formats last chosen in the Generate SBOM dialog. Every format until the user chooses.
+    /// </summary>
+    property SBOMFormats : TSBOMFormats read GetSBOMFormats write SetSBOMFormats;
+
     property FileName : string read GetOptionsFileName;
   end;
 
@@ -84,6 +93,7 @@ type
     FLogWindowWidth : integer;
     FLogWindowHeight : integer;
     FUpdateChannel : TDPMUpdateChannel;
+    FSBOMFormats : TSBOMFormats;
   protected
     function LoadFromJson(const jsonObj : TJsonObject) : boolean;
     function SaveToJson(const parentObj : TJsonObject) : boolean;
@@ -123,6 +133,9 @@ type
     function GetUpdateChannel : TDPMUpdateChannel;
     procedure SetUpdateChannel(const value : TDPMUpdateChannel);
 
+    function GetSBOMFormats : TSBOMFormats;
+    procedure SetSBOMFormats(const value : TSBOMFormats);
+
   public
     constructor Create;
   end;
@@ -158,6 +171,18 @@ begin
   //Stable would mean the update check never finds anything and the feature
   //ships dormant. Beta is a superset, so stable releases are still offered.
   FUpdateChannel := TDPMUpdateChannel.Beta;
+  //what the IDE generated before the Generate SBOM dialog let the user choose
+  FSBOMFormats := cAllSBOMFormats;
+end;
+
+function TDPMIDEOptions.GetSBOMFormats : TSBOMFormats;
+begin
+  result := FSBOMFormats;
+end;
+
+procedure TDPMIDEOptions.SetSBOMFormats(const value : TSBOMFormats);
+begin
+  FSBOMFormats := value;
 end;
 
 function TDPMIDEOptions.GetAddDPMToProjectTree: boolean;
@@ -321,6 +346,16 @@ begin
   if jsonObj.Contains('logwindowheight') then
     FLogWindowHeight := jsonObj.I['logwindowheight'];
 
+  //'cyclonedx,spdx,html' - a value edited into something we can't parse keeps the default
+  if jsonObj.Contains('sbomformats') then
+  begin
+    try
+      FSBOMFormats := StringToSBOMFormats(jsonObj.S['sbomformats']);
+    except
+      on e : EArgumentException do
+        FSBOMFormats := cAllSBOMFormats;
+    end;
+  end;
 end;
 
 function TDPMIDEOptions.SaveToFile(const fileName: string): Boolean;
@@ -365,6 +400,7 @@ begin
   parentObj.I['logwindowwidth'] := FLogWindowWidth;
   parentObj.I['logwindowheight'] := FLogWindowHeight;
   parentObj.S['updatechannel'] := GetEnumName(TypeInfo(TDPMUpdateChannel), Ord(FUpdateChannel));
+  parentObj.S['sbomformats'] := SBOMFormatsToString(FSBOMFormats);
 
   result := true;
 end;

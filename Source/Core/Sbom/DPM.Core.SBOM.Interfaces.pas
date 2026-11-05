@@ -31,7 +31,8 @@ interface
 uses
   VSoft.CancellationToken,
   DPM.Core.Options.Sbom,
-  DPM.Core.SBOM.Types;
+  DPM.Core.SBOM.Types,
+  DPM.Core.SBOM.ProductInfo;
 
 type
   ///<summary>Single output-format writer (CycloneDX, SPDX, etc).
@@ -52,6 +53,11 @@ type
   ISbomGenerator = interface
     ['{F1A0C0F2-DC4C-4D6D-BE3F-5A87BD68F69A}']
     function Generate(const cancellationToken : ICancellationToken; const options : TSBOMOptions) : boolean;
+    ///<summary>The version info layer of the product metadata for options.ProjectPath, as Generate
+    /// would read it : the configuration Generate would pick, the first enabled platform. Empty for
+    /// a .groupproj, a project without version info, or a project that cannot be loaded - this is a
+    /// hint (the IDE's SBOM dialog shows it), so problems are logged at debug level, never as errors.</summary>
+    function GetVersionInfoDefaults(const options : TSBOMOptions) : TSBOMProductInfo;
   end;
 
   ///<summary>Inverse of ISbomWriter for the CycloneDX format - parses an existing

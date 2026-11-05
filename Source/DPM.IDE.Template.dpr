@@ -245,6 +245,7 @@ uses
   DPM.Core.Package.Signing.Interfaces in 'Core\Package\Signing\DPM.Core.Package.Signing.Interfaces.pas',
   DPM.Core.Package.Signing in 'Core\Package\Signing\DPM.Core.Package.Signing.pas',
   DPM.IDE.TrustPromptForm in 'IDE\DPM.IDE.TrustPromptForm.pas',
+  DPM.IDE.SBOMOptionsForm in 'IDE\DPM.IDE.SBOMOptionsForm.pas',
   DPM.Core.Trust.Prompt in 'Core\Trust\DPM.Core.Trust.Prompt.pas',
   DPM.IDE.Trust.Prompt in 'IDE\DPM.IDE.Trust.Prompt.pas',
   DPM.IDE.SigningBadge in 'IDE\DPM.IDE.SigningBadge.pas';

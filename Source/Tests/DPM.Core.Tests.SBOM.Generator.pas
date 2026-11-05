@@ -54,6 +54,7 @@ type
     function DependsOn(const doc : TJsonObject; const parentRef, childRef : string) : boolean;
     procedure AssertBomRefsAreUnique(const doc : TJsonObject);
     procedure WriteSharedComponentsGroup;
+    function VersionInfoDefaults(const projectPath, configName : string) : TSBOMProductInfo;
   public
     [SetupFixture]
     procedure FixtureSetup;
@@ -72,6 +73,18 @@ type
     procedure RootVersion_FallsBackToFileVersion;
     [Test]
     procedure RootVersion_IsOmittedWithoutVersionInfo;
+
+    //the version info layer on its own - what the IDE's SBOM dialog shows as the fallbacks
+    [Test]
+    procedure VersionInfoDefaults_AreTheReleaseConfigurationValues;
+    [Test]
+    procedure VersionInfoDefaults_UseTheRequestedConfiguration;
+    [Test]
+    procedure VersionInfoDefaults_WithoutVersionInfo_AreEmpty;
+    [Test]
+    procedure VersionInfoDefaults_ForAGroupProject_AreEmpty;
+    [Test]
+    procedure VersionInfoDefaults_ForAMissingProject_AreEmptyWithoutAnError;
 
     [Test]
     procedure ThirdPartyFoldersWithTheSameName_GetDistinctBomRefs;
@@ -261,6 +274,18 @@ type
     procedure DelphiDefaultVersionGivenExplicitly_IsNotWarned;
     [Test]
     procedure MissingLicense_IsWarned;
+
+    //the same gaps as a set - what the IDE's SBOM dialog lists
+    [Test]
+    procedure Gaps_OfCompleteMetadata_AreNone;
+    [Test]
+    procedure Gaps_OfEmptyMetadata_NameEachMissingField;
+    [Test]
+    procedure Gaps_SupplierWithoutContact;
+    [Test]
+    procedure Gaps_SupplierThatIsAnEmail_IsItsOwnContact;
+    [Test]
+    procedure Gaps_DelphiDefaultVersion_OnlyFromVersionInfo;
   end;
 
   //An SBOM creator / supplier contact must be one of these, or it is rejected or misfiled.
@@ -756,6 +781,99 @@ begin
   finally
     doc.Free;
   end;
+end;
+
+function TSBOMGeneratorTests.VersionInfoDefaults(const projectPath, configName : string) : TSBOMProductInfo;
+var
+  options : TSBOMOptions;
+begin
+  options := TSBOMOptions.Create;
+  try
+    options.ConfigFile := WriteConfig;
+    options.ProjectPath := projectPath;
+    options.Config := configName;
+    result := CreateGenerator.GetVersionInfoDefaults(options);
+  finally
+    options.Free;
+  end;
+end;
+
+procedure TSBOMGeneratorTests.VersionInfoDefaults_AreTheReleaseConfigurationValues;
+var
+  dproj : string;
+  info : TSBOMProductInfo;
+begin
+  dproj := TPath.Combine(FTempDir, 'app\App.dproj');
+  WriteDproj(dproj, 'App', VerInfo('CompanyName=Base Co;ProductVersion=3.1.4'),
+                           VerInfo('CompanyName=Acme Ltd;ProductVersion=3.1.5'));
+
+  //no configuration asked for - the one Generate would pick
+  info := VersionInfoDefaults(dproj, '');
+
+  Assert.AreEqual('Acme Ltd', info.Supplier, false);
+  Assert.AreEqual('3.1.5', info.Version, false);
+  Assert.AreEqual('', info.SupplierUrl, false);
+  Assert.AreEqual('', info.License, false);
+  Assert.AreEqual('', info.SbomCreator, false);
+end;
+
+procedure TSBOMGeneratorTests.VersionInfoDefaults_UseTheRequestedConfiguration;
+var
+  dproj : string;
+  info : TSBOMProductInfo;
+begin
+  dproj := TPath.Combine(FTempDir, 'app\App.dproj');
+  WriteDproj(dproj, 'App', VerInfo('CompanyName=Base Co;ProductVersion=3.1.4'),
+                           VerInfo('CompanyName=Acme Ltd;ProductVersion=3.1.5'));
+
+  info := VersionInfoDefaults(dproj, 'Debug');
+
+  Assert.AreEqual('Base Co', info.Supplier, false);
+  Assert.AreEqual('3.1.4', info.Version, false);
+end;
+
+procedure TSBOMGeneratorTests.VersionInfoDefaults_WithoutVersionInfo_AreEmpty;
+var
+  dproj : string;
+  info : TSBOMProductInfo;
+begin
+  dproj := TPath.Combine(FTempDir, 'app\App.dproj');
+  WriteDproj(dproj, 'App', '', '');
+
+  info := VersionInfoDefaults(dproj, '');
+
+  Assert.AreEqual('', info.Supplier, false);
+  Assert.AreEqual('', info.Version, false);
+end;
+
+procedure TSBOMGeneratorTests.VersionInfoDefaults_ForAGroupProject_AreEmpty;
+var
+  dproj : string;
+  groupProj : string;
+  info : TSBOMProductInfo;
+begin
+  dproj := TPath.Combine(FTempDir, 'app\App.dproj');
+  WriteDproj(dproj, 'App', VerInfo('CompanyName=Acme Ltd;ProductVersion=3.1.5'), '');
+  groupProj := TPath.Combine(FTempDir, 'Group.groupproj');
+  WriteGroupProj(groupProj, ['app\App.dproj']);
+
+  //the group's own product has no version info - its projects' values describe them, not it
+  info := VersionInfoDefaults(groupProj, '');
+
+  Assert.AreEqual('', info.Supplier, false);
+  Assert.AreEqual('', info.Version, false);
+end;
+
+procedure TSBOMGeneratorTests.VersionInfoDefaults_ForAMissingProject_AreEmptyWithoutAnError;
+var
+  info : TSBOMProductInfo;
+begin
+  info := VersionInfoDefaults(TPath.Combine(FTempDir, 'nowhere\App.dproj'), '');
+
+  Assert.AreEqual('', info.Supplier, false);
+  Assert.AreEqual('', info.Version, false);
+  //a hint for a dialog, not an operation that failed
+  Assert.AreEqual(0, FLogger.Diagnostics.Count, FLogger.Diagnostics.Text);
 end;
 
 procedure TSBOMGeneratorTests.RootVersion_FallsBackToFileVersion;
@@ -2432,6 +2550,54 @@ begin
   info := Complete;
   info.License := '';
   AssertOneWarningAbout(GetProductInfoWarnings(info, true, 'App.sbom.yaml'), 'license:');
+end;
+
+procedure TSBOMProductWarningsTests.Gaps_OfCompleteMetadata_AreNone;
+begin
+  Assert.IsTrue(GetProductInfoGaps(Complete, true) = []);
+end;
+
+procedure TSBOMProductWarningsTests.Gaps_OfEmptyMetadata_NameEachMissingField;
+var
+  info : TSBOMProductInfo;
+begin
+  info.Version := '';
+  info.Supplier := '';
+  info.SupplierUrl := '';
+  info.License := '';
+  info.SbomCreator := '';
+  //no supplier at all is the gap - not also a supplier without a contact
+  Assert.IsTrue(GetProductInfoGaps(info, false) = [TSBOMProductInfoGap.NoSupplier, TSBOMProductInfoGap.NoSbomCreator,
+                                                   TSBOMProductInfoGap.NoVersion, TSBOMProductInfoGap.NoLicense]);
+end;
+
+procedure TSBOMProductWarningsTests.Gaps_SupplierWithoutContact;
+var
+  info : TSBOMProductInfo;
+begin
+  info := Complete;
+  info.SupplierUrl := '';
+  Assert.IsTrue(GetProductInfoGaps(info, true) = [TSBOMProductInfoGap.NoSupplierContact]);
+end;
+
+procedure TSBOMProductWarningsTests.Gaps_SupplierThatIsAnEmail_IsItsOwnContact;
+var
+  info : TSBOMProductInfo;
+begin
+  info := Complete;
+  info.Supplier := 'sales@acme.example';
+  info.SupplierUrl := '';
+  Assert.IsTrue(GetProductInfoGaps(info, true) = []);
+end;
+
+procedure TSBOMProductWarningsTests.Gaps_DelphiDefaultVersion_OnlyFromVersionInfo;
+var
+  info : TSBOMProductInfo;
+begin
+  info := Complete;
+  info.Version := '1.0.0.0';
+  Assert.IsTrue(GetProductInfoGaps(info, false) = [TSBOMProductInfoGap.DefaultVersion]);
+  Assert.IsTrue(GetProductInfoGaps(info, true) = []);
 end;
 
 { TSBOMContactTests }

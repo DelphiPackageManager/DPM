@@ -53,6 +53,14 @@ type
     function Merge(const fallback : TSBOMProductInfo) : TSBOMProductInfo;
   end;
 
+  {$SCOPEDENUMS ON}
+  ///<summary>A gap in the product metadata that the CRA / BSI TR-03183-2 expect filled.
+  /// NoSupplierContact is only reported for a supplier that is there; DefaultVersion is a version
+  /// of 1.0.0.0 that came from the project's version info.</summary>
+  TSBOMProductInfoGap = (NoSupplier, NoSupplierContact, NoSbomCreator, NoVersion, DefaultVersion, NoLicense);
+  TSBOMProductInfoGaps = set of TSBOMProductInfoGap;
+  {$SCOPEDENUMS OFF}
+
 ///<summary>The sidecar for a project : MyApp.dproj -> MyApp.sbom.yaml in the same folder.</summary>
 function SBOMSidecarFileName(const projectPath : string) : string;
 
@@ -63,6 +71,15 @@ function SBOMSidecarFileName(const projectPath : string) : string;
 /// caller should not emit an SBOM that silently lacks what the user asked for.</summary>
 function LoadSBOMSidecar(const logger : ILogger; const projectPath : string;
                          out info : TSBOMProductInfo; const rules : ISBOMComponentRules) : boolean;
+
+///<summary>Writes info's five product fields into the sidecar next to projectPath, keeping every
+/// other key (components, ownUnits, ownUnitPrefixes, anything unknown). A blank field is written as
+/// null where the key already exists and left out where it does not. Creates the file when there is
+/// none and info has at least one value. Leaves the file untouched when nothing changes.
+/// Returns false, having logged an error, when the existing sidecar cannot be read or the file
+/// cannot be written - an unreadable sidecar is never overwritten.</summary>
+function SaveSBOMSidecar(const logger : ILogger; const projectPath : string;
+                         const info : TSBOMProductInfo) : boolean;
 
 ///<summary>A plain address - local@domain.tld, no spaces, no scheme. Not RFC 5322, just enough to
 /// tell an email address apart from a URL or a company name.</summary>
@@ -76,6 +93,10 @@ function IsHttpUrl(const value : string) : boolean;
 /// 1.0.0.0 is only suspicious when it is the Delphi default for a new project.</summary>
 function GetProductInfoWarnings(const info : TSBOMProductInfo; const versionIsExplicit : boolean;
                                 const sidecarName : string) : TArray<string>;
+
+///<summary>The same gaps GetProductInfoWarnings reports, as a set - for a caller that words them its
+/// own way, such as the IDE's SBOM dialog.</summary>
+function GetProductInfoGaps(const info : TSBOMProductInfo; const versionIsExplicit : boolean) : TSBOMProductInfoGaps;
 
 implementation
 
@@ -144,30 +165,55 @@ function GetProductInfoWarnings(const info : TSBOMProductInfo; const versionIsEx
     result[Length(result) - 1] := 'CRA/BSI: ' + text;
   end;
 
+var
+  gaps : TSBOMProductInfoGaps;
 begin
   result := nil;
-  if info.Supplier = '' then
+  gaps := GetProductInfoGaps(info, versionIsExplicit);
+  if TSBOMProductInfoGap.NoSupplier in gaps then
     Add('the SBOM names no supplier for the product (CRA Annex II 1, BSI TR-03183-2 5.2.2). ' +
-        'Set supplier: in ' + sidecarName + ', pass --supplier, or fill CompanyName in the project version info.')
-  else if (info.SupplierUrl = '') and not IsEmailAddress(info.Supplier) then
+        'Set supplier: in ' + sidecarName + ', pass --supplier, or fill CompanyName in the project version info.');
+  if TSBOMProductInfoGap.NoSupplierContact in gaps then
     Add('the supplier [' + info.Supplier + '] has no contact - CRA Annex II 1 asks for an email address or other ' +
         'digital contact, BSI TR-03183-2 5.2.2 for an email address or URL. Set supplierUrl: in ' + sidecarName +
         ' or pass --supplier-url.');
 
-  if info.SbomCreator = '' then
+  if TSBOMProductInfoGap.NoSbomCreator in gaps then
     Add('the SBOM does not say who created it (BSI TR-03183-2 5.2.1). Set sbomCreator: in ' + sidecarName +
         ' to an email address or URL, or pass --sbom-creator.');
 
-  if info.Version = '' then
+  if TSBOMProductInfoGap.NoVersion in gaps then
     Add('the product has no version (CRA Annex II 3, BSI TR-03183-2 5.2.2). Set version: in ' + sidecarName +
-        ', pass --version, or include version info in the project.')
-  else if (info.Version = '1.0.0.0') and not versionIsExplicit then
+        ', pass --version, or include version info in the project.');
+  if TSBOMProductInfoGap.DefaultVersion in gaps then
     Add('the product version is 1.0.0.0, the default for a new Delphi project. If that is not the real release, ' +
         'set version: in ' + sidecarName + ', pass --version, or update the project version info.');
 
-  if info.License = '' then
+  if TSBOMProductInfoGap.NoLicense in gaps then
     Add('the product has no distribution licence (BSI TR-03183-2 5.2.2). Set license: in ' + sidecarName +
         ' to an SPDX identifier or expression, or pass --license.');
+end;
+
+function GetProductInfoGaps(const info : TSBOMProductInfo; const versionIsExplicit : boolean) : TSBOMProductInfoGaps;
+begin
+  result := [];
+  if info.Supplier = '' then
+    Include(result, TSBOMProductInfoGap.NoSupplier)
+  //an email address is a contact in itself
+  else if (info.SupplierUrl = '') and not IsEmailAddress(info.Supplier) then
+    Include(result, TSBOMProductInfoGap.NoSupplierContact);
+
+  if info.SbomCreator = '' then
+    Include(result, TSBOMProductInfoGap.NoSbomCreator);
+
+  if info.Version = '' then
+    Include(result, TSBOMProductInfoGap.NoVersion)
+  //a new Delphi project starts at 1.0.0.0, so from the version info it is probably not the real release
+  else if (info.Version = '1.0.0.0') and not versionIsExplicit then
+    Include(result, TSBOMProductInfoGap.DefaultVersion);
+
+  if info.License = '' then
+    Include(result, TSBOMProductInfoGap.NoLicense);
 end;
 
 //RawValue rather than AsString for anything but a string - 'version: 2.1' is a float to YAML, but
@@ -352,6 +398,123 @@ begin
           logger.Warning(TWarningCode.W8103_SBOMProductInfoIgnored, '[SBOM] ignoring unknown key [' + key + '] in [' + fileName + '] - expected version, supplier, ' +
                          'supplierUrl, license, sbomCreator, components, ownUnits or ownUnitPrefixes');
       end;
+    end;
+  end;
+  result := true;
+end;
+
+//The key's spelling in mapping when it is there in any case - the reader matches keys ignoring case,
+//so 'Supplier:' is updated rather than joined by a second 'supplier:'. '' when it is not there.
+function FindKey(const mapping : IYAMLMapping; const key : string) : string;
+var
+  i : integer;
+begin
+  result := '';
+  for i := 0 to mapping.Count - 1 do
+    if SameText(mapping.Keys[i], key) then
+    begin
+      result := mapping.Keys[i];
+      exit;
+    end;
+end;
+
+function SaveSBOMSidecar(const logger : ILogger; const projectPath : string;
+                         const info : TSBOMProductInfo) : boolean;
+const
+  cKeys : array[0..4] of string = ('version', 'supplier', 'supplierUrl', 'license', 'sbomCreator');
+var
+  fileName : string;
+  doc : IYAMLDocument;
+  mapping : IYAMLMapping;
+  values : array[0..4] of string;
+  i : integer;
+  key : string;
+  current : IYAMLValue;
+  currentValue : string;
+  changed : boolean;
+begin
+  result := false;
+  values[0] := Trim(info.Version);
+  values[1] := Trim(info.Supplier);
+  values[2] := Trim(info.SupplierUrl);
+  values[3] := Trim(info.License);
+  values[4] := Trim(info.SbomCreator);
+
+  fileName := SBOMSidecarFileName(projectPath);
+  doc := nil;
+  if FileExists(fileName) then
+  begin
+    try
+      doc := TYAML.LoadFromFile(fileName);
+    except
+      on e : Exception do
+      begin
+        logger.Error(TErrorCode.E8102_SBOMProductInfoUnreadable, '[SBOM] could not read [' + fileName + '] : ' + e.Message +
+                     ' - it was not changed');
+        exit;
+      end;
+    end;
+    //an empty file is a sidecar with nothing in it yet
+    if (doc = nil) or (doc.Root = nil) or doc.Root.IsNull then
+      doc := nil
+    else if not doc.Root.IsMapping then
+    begin
+      logger.Error(TErrorCode.E8101_SBOMProductInfoInvalid, '[SBOM] [' + fileName + '] must be a mapping of key: value pairs - it was not changed');
+      exit;
+    end;
+  end;
+  if doc = nil then
+    doc := TYAML.CreateMapping;
+  mapping := doc.Root.AsMapping;
+
+  changed := false;
+  for i := Low(cKeys) to High(cKeys) do
+  begin
+    key := FindKey(mapping, cKeys[i]);
+    if key = '' then
+    begin
+      //a blank value is already what an absent key means
+      if values[i] <> '' then
+      begin
+        mapping.AddOrSetValue(cKeys[i], values[i]);
+        changed := true;
+      end;
+      continue;
+    end;
+
+    //compared the way LoadSBOMSidecar reads it, so 'version: 2.1' (a float to YAML) matches '2.1'.
+    //The reader ignores a value that isn't a single value, so that counts as blank.
+    current := mapping.Values[key];
+    if (current = nil) or current.IsNull or not current.IsScalar then
+      currentValue := ''
+    else
+      currentValue := ScalarText(current);
+    if currentValue = values[i] then
+      continue;
+
+    //VSoft.YAML can't remove a key; the reader treats a null as unset
+    if values[i] = '' then
+      mapping.AddOrSetNull(key)
+    else
+      mapping.AddOrSetValue(key, values[i]);
+    changed := true;
+  end;
+
+  //nothing to say - leave the file (or its absence) exactly as it was
+  if not changed then
+  begin
+    result := true;
+    exit;
+  end;
+
+  doc.Options.WriteByteOrderMark := false;
+  try
+    TYAML.WriteToFile(doc, fileName);
+  except
+    on e : Exception do
+    begin
+      logger.Error(TErrorCode.E8117_SBOMProductInfoWriteFailed, '[SBOM] could not write [' + fileName + '] : ' + e.Message);
+      exit;
     end;
   end;
   result := true;

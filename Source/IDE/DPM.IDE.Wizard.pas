@@ -526,13 +526,13 @@ begin
 
   //Hidden until a saved .groupproj is open - DPMGenerateSBOMGroupUpdate flips it.
   //Start invisible so it doesn't flash before the first OnUpdate fires.
-  sbomGroupAction := CreateAction('actDPMGenerateSBOMGroup', 'Generate SBOM for Project Group',
+  sbomGroupAction := CreateAction('actDPMGenerateSBOMGroup', 'Generate SBOM for Project Group...',
     'Generate an aggregated SBOM for the open project group.',
     Self.DPMGenerateSBOMGroupClick, Self.DPMGenerateSBOMGroupUpdate);
   sbomGroupAction.Visible := false;
   AddChild(sbomGroupAction);
 
-  sbomProjectAction := CreateAction('actDPMGenerateSBOMProject', 'Generate SBOM for Project',
+  sbomProjectAction := CreateAction('actDPMGenerateSBOMProject', 'Generate SBOM for Project...',
     'Generate an SBOM for the active project.',
     Self.DPMGenerateSBOMProjectClick, Self.DPMGenerateSBOMProjectUpdate);
   AddChild(sbomProjectAction);

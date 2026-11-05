@@ -299,6 +299,7 @@
         <DCCReference Include="Tests\DPM.Core.Tests.Utils.PEImports.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Sbom.Writers.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.ComponentRules.pas"/>
+        <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Sidecar.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.SBOM.Generator.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Reader.pas"/>
         <DCCReference Include="Tests\DPM.Core.Tests.Spec.Collapse.pas"/>

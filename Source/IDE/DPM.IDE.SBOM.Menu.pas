@@ -29,14 +29,15 @@ unit DPM.IDE.SBOM.Menu;
 { IDE project-tree menu entry for "Generate SBOM".
 
   Right-clicking a .dproj or .groupproj in the IDE Project Manager exposes a
-  "Generate SBOM" item alongside "Manage DPM Packages". Selecting it runs
-  the same ISBOMGenerator the CLI uses, against the active project / group,
-  with default options (all four formats; output dropped next to the project
-  file). Progress + completion show up in the standard DPM message tab.
+  "Generate SBOM" item alongside "Manage DPM Packages". Selecting it shows the
+  Generate SBOM dialog (DPM.IDE.SBOMOptionsForm) - the product information,
+  saved to the project's <name>.sbom.yaml sidecar when asked, and the formats
+  and output folder - then runs the same ISBOMGenerator the CLI uses, against
+  the project / group. Progress + completion show up in the standard DPM
+  message tab.
 
-  Kept synchronous for MVP - SBOM generation is fast for typical projects.
-  An options dialog and background-thread execution are obvious next steps
-  but not required to ship the feature. }
+  Kept synchronous - SBOM generation is fast for typical projects, and IDE
+  operations stay on the main thread. }
 
 interface
 
@@ -140,9 +141,10 @@ type
     constructor Create(const projectGroup : IOTAProjectGroup; const project : IOTAProject;
                        const container : TContainer; const logger : ILogger;
                        const isGroupContext : boolean);
-    //Shared SBOM generation routine. Resolves ISbomGenerator from the container and
-    //runs it against targetPath (a .dproj or .groupproj), dropping output next to the
-    //file. Called both from this project-tree menu's Execute and from the top-level
+    //Shared SBOM generation routine. Shows the Generate SBOM dialog for targetPath (a
+    //.dproj or .groupproj), then resolves ISbomGenerator from the container and runs it
+    //with the dialog's choices. Cancelling the dialog generates and writes nothing.
+    //Called both from this project-tree menu's Execute and from the top-level
     //DPM menu in TDPMWizard, so the logic lives in one place.
     class procedure RunSBOM(const container : TContainer; const logger : ILogger; const targetPath : string); static;
   end;
@@ -151,13 +153,17 @@ implementation
 
 uses
   System.SysUtils,
+  System.UITypes,
   Vcl.Dialogs,
   VSoft.CancellationToken,
   DPM.Core.Options.SBOM,
   DPM.Core.SBOM.Interfaces,
+  DPM.Core.SBOM.ProductInfo,
   DPM.Core.Utils.Config,
   DPM.IDE.Constants,
   DPM.IDE.Logger,
+  DPM.IDE.Options,
+  DPM.IDE.SBOMOptionsForm,
   DPM.Core.Diagnostics;
 
 { TDPMSBOMProjectMenuNotifier }
@@ -434,9 +440,12 @@ var
   options : TSBOMOptions;
   outDir : string;
   ideLogger : IDPMIDELogger;
+  ideOptions : IDPMIDEOptions;
   cancelTokenSource : ICancellationTokenSource;
   ok : boolean;
   guard : TOperationGuard;
+  sidecarInfo : TSBOMProductInfo;
+  values : TSBOMDialogValues;
 begin
   if (targetPath = '') or (not FileExists(targetPath)) then
   begin
@@ -457,14 +466,12 @@ begin
     end;
   end;
 
-  //Output dir defaults to next to the project. Same convention as the CLI - keeps
-  //the SBOM files alongside the .dproj where reviewers tend to look first.
-  outDir := ExtractFilePath(targetPath);
+  ideOptions := container.Resolve<IDPMIDEOptions>;
+  Supports(logger, IDPMIDELogger, ideLogger);
 
   options := TSBOMOptions.Create;
   try
     options.ProjectPath := targetPath;
-    options.OutputDir := outDir;
     //The generator's first step is FConfigManager.LoadConfig(options.ConfigFile)
     //which fails with 'Cannot open file ""' when ConfigFile is blank. The CLI
     //populates this via TOptionsBase.ApplyCommon(TCommonOptions.Default), which
@@ -472,17 +479,68 @@ begin
     //Fall back to the user's default config explicitly.
     TConfigUtils.EnsureDefaultConfigDir;
     options.ConfigFile := TConfigUtils.GetDefaultConfigFileName;
-    //All four formats. The HTML and Markdown reports are the ones a reviewer
-    //opening the project in the IDE will actually want; the JSON ones are
-    //there for any external tooling later.
-    options.Formats := cAllSBOMFormats;
+
+    //What the sidecar says now, to prefill the dialog. One that can't be read is reported here
+    //rather than overwritten by the dialog's values (LoadSBOMSidecar logged why).
+    if not LoadSBOMSidecar(logger, targetPath, sidecarInfo, nil) then
+    begin
+      if ideLogger <> nil then
+        ideLogger.ShowMessageTab;
+      MessageDlg('The SBOM product information file [' + SBOMSidecarFileName(targetPath) + '] could not be read - ' +
+                 'see the DPM message tab. Fix or delete it, then generate the SBOM again.', mtError, [mbOK], 0);
+      exit;
+    end;
+
+    values.Info := sidecarInfo;
+    values.Fallback := generator.GetVersionInfoDefaults(options);
+    values.Formats := ideOptions.SBOMFormats;
+    //Output dir defaults to next to the project. Same convention as the CLI - keeps
+    //the SBOM files alongside the .dproj where reviewers tend to look first.
+    values.OutputDir := ExtractFileDir(targetPath);
+    values.SaveToSidecar := true;
+    if not TSBOMOptionsForm.Execute(targetPath, values) then
+      exit;
+
+    //the formats are the user's preference, not the project's
+    if ideOptions.SBOMFormats <> values.Formats then
+    begin
+      ideOptions.SBOMFormats := values.Formats;
+      try
+        ideOptions.SaveToFile;
+      except
+        //only a convenience for next time - not a reason to stop
+        on e : Exception do
+          logger.Information('[SBOM] could not remember the chosen formats : ' + e.Message);
+      end;
+    end;
+
+    if values.SaveToSidecar and not SaveSBOMSidecar(logger, targetPath, values.Info) then
+    begin
+      //SaveSBOMSidecar logged why. The values below still apply to this run.
+      if ideLogger <> nil then
+        ideLogger.ShowMessageTab;
+      MessageDlg('The product information could not be saved to [' + SBOMSidecarFileName(targetPath) + '] - see the ' +
+                 'DPM message tab. The SBOM will still be generated with the values you entered.', mtWarning, [mbOK], 0);
+    end;
+
+    //The dialog's values go to the generator as options, which override the sidecar - so this
+    //run uses what the user saw whether or not it was saved. A blank one falls through to the
+    //sidecar and then the version info, as on the command line.
+    options.Supplier := values.Info.Supplier;
+    options.SupplierUrl := values.Info.SupplierUrl;
+    options.License := values.Info.License;
+    options.SbomCreator := values.Info.SbomCreator;
+    options.ProductVersion := values.Info.Version;
+    options.Formats := values.Formats;
+    outDir := values.OutputDir;
+    options.OutputDir := outDir;
     options.IncludeRuntime := true;
     options.Strict := false;
     //PerProject stays false - aggregated group SBOM when the input is a .groupproj.
 
     //Surface progress via the existing DPM message tab. The generator's
     //Information / Warning / Error calls land there via TDPMIDELogger.
-    if Supports(logger, IDPMIDELogger, ideLogger) then
+    if ideLogger <> nil then
       ideLogger.ShowMessageTab;
     logger.Information('[SBOM] generating SBOM for ' + targetPath + ' -> ' + outDir);
 
@@ -514,18 +572,16 @@ end;
 
 function TDPMSBOMProjectMenu.GetCaption : string;
 begin
-  //Trailing ellipsis: this menu currently has no options dialog, but it kicks off a
-  //potentially-slow operation that shows output. The ellipsis primes the user to
-  //expect "something happens" rather than an instant action.
+  //Trailing ellipsis: the command opens the Generate SBOM dialog.
   //Caption tracks the actual target: when the user right-clicks the group root we
   //drop the project name to avoid the misleading "Generate SBOM : OneProject"
   //label while we're actually about to aggregate the entire group.
   if FIsGroupContext then
-    result := 'Generate SBOM for Project Group'
+    result := 'Generate SBOM for Project Group...'
   else if FProject <> nil then
-    result := Format('Generate SBOM : %s', [ExtractFileName(FProject.FileName)])
+    result := Format('Generate SBOM : %s...', [ExtractFileName(FProject.FileName)])
   else
-    result := 'Generate SBOM for Project Group';
+    result := 'Generate SBOM for Project Group...';
 end;
 
 function TDPMSBOMProjectMenu.GetChecked : Boolean;
