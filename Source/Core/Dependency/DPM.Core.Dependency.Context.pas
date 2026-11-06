@@ -147,8 +147,9 @@ type
     /// preferredVersions : lock-file style hints (id -> version) tried before anything else - restore passes
     /// the project's graph, install nil.
     /// pinnedPackages : packages an upgrade changes in place where the project has them only as dependencies - each
-    /// is the only version tried for its id and stays a dependency. May be nil; newPackages may be empty when there
-    /// are pins.
+    /// is the only version tried for its id and stays a dependency. A pin nothing in the project depends on is never
+    /// resolved - it simply isn't in the result. Never a top level reference's id (asserted). May be nil;
+    /// newPackages may be empty when there are pins.
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string;
                        const compilerVersion : TCompilerVersion; const newPackages : IList<IPackageInfo>;
                        const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
@@ -353,6 +354,8 @@ begin
   for reference in projectReferences do
   begin
     id := LowerCase(reference.Id);
+    //the planner only pins a package the project has as a dependency - pinning a top level would quietly demote it.
+    Assert(not (reference.IsTopLevel and FPins.ContainsKey(id)), 'pinned package [' + reference.Id + '] is a top level reference');
     //The package being installed - or, on restore's slow path, the top level being re-resolved - can also be
     //among the references : restore feeds the previous iteration's flattened graph (top levels AND transients)
     //back in. It replaces the reference - the top level pin is not negotiable.

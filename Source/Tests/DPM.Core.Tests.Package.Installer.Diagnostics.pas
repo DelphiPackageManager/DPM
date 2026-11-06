@@ -2713,7 +2713,9 @@ begin
   logger := TTestLogger.Create;
   loggerIntf := logger;
   Assert.IsTrue(UpgradeBarInLockedProject(FTempFolder, loggerIntf, '[1.0.0,]', '1.0.0', projectText), logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
   Assert.IsTrue(Pos('id="VSoft.Bar" version="1.0.1"', projectText) > 0, projectText);
+  Assert.AreEqual(1, Occurrences('id="VSoft.Bar"', projectText), 'not also a top level : ' + projectText);
 end;
 
 procedure TInstallerDiagnosticsTests.Upgrade_Leaves_The_Project_When_The_Parent_Rejects_The_Version;
@@ -2726,6 +2728,7 @@ begin
   loggerIntf := logger;
   Assert.IsFalse(UpgradeBarInLockedProject(FTempFolder, loggerIntf, '1.0.0', '', projectText), logger.Messages.Text);
   Assert.IsTrue(logger.HasError(TErrorCode.E3001_NothingToInstall), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('error', 'every project that has the package(s) was left unchanged'), 'not ''none of the projects need'' : ' + logger.Messages.Text);
   Assert.IsTrue(logger.Logged('information', 'left unchanged in Consumer.dproj - VSoft.Foo 1.0.0 requires VSoft.Bar 1.0.0'), logger.Messages.Text);
   Assert.AreEqual(0, BuildCount, 'nothing is rebuilt');
   Assert.IsTrue(Pos('id="VSoft.Bar" version="1.0.0"', projectText) > 0, projectText);

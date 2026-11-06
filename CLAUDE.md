@@ -75,7 +75,8 @@ works over the undo trail in `TResolverContext` (`Context.pas`).
   references, top levels and imports are fixed facts at level 0.
 - **Candidates:** they must satisfy every declared range on the package. They come from three tiers:
   the preferred (lock) version, then the package cache, then the repository, which is asked once per
-  range.
+  range. A pinned package (an upgrade changing a dependency in place) overrides all three tiers - the pin
+  is the only candidate.
 - **On a failure:** the search jumps back to the highest level involved. A version is marked no-good
   only when it fails on fixed facts alone.
 - **Unavoidable failures:** a failure with an empty level set is recorded once, and that package is

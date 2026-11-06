@@ -2971,13 +2971,29 @@ begin
     FLogger.Error(TErrorCode.E1101_PackageNotFound, description + '.');
 end;
 
+//true when an upgrade leaves a project that has one of the plan's packages unchanged (see IInstallPlanItem.BlockedProjects).
+function AnyProjectLeftUnchanged(const plan : IInstallPlan) : boolean;
+var
+  item : IInstallPlanItem;
+begin
+  result := false;
+  for item in plan.Items do
+  begin
+    if item.BlockedProjects.Any then
+      exit(true);
+  end;
+end;
+
 procedure TPackageInstaller.LogPlanSummary(const plan : IInstallPlan);
 var
   line : string;
+  important : boolean;
 begin
-  //companions are packages the user didn't ask for - make sure they are seen.
+  //companions are packages the user didn't ask for, and a project left unchanged is one they may expect to change -
+  //make sure they are seen.
+  important := plan.HasCompanions or AnyProjectLeftUnchanged(plan);
   for line in plan.SummaryLines do
-    FLogger.Information(line, plan.HasCompanions);
+    FLogger.Information(line, important);
 end;
 
 function TPackageInstaller.DoPlanInstall(const cancellationToken : ICancellationToken; const options : TInstallOptions; out plan : IInstallPlan;
@@ -3151,7 +3167,10 @@ begin
   end;
   if not plan.Projects.Any then
   begin
-    FLogger.Error(TErrorCode.E3001_NothingToInstall, 'There is nothing to install - none of the projects need the package(s).');
+    if AnyProjectLeftUnchanged(plan) then
+      FLogger.Error(TErrorCode.E3001_NothingToInstall, 'There is nothing to install - every project that has the package(s) was left unchanged, see the plan above.')
+    else
+      FLogger.Error(TErrorCode.E3001_NothingToInstall, 'There is nothing to install - none of the projects need the package(s).');
     exit;
   end;
   result := true;

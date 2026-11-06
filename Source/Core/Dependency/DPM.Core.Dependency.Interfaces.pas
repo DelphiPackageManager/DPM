@@ -227,7 +227,8 @@ type
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean; overload;
     //pinnedPackages : packages to change in place where the project has them only as dependencies (an upgrade of a
     //transitive package) - each is the only version tried for its id, ahead of the lock and of other projects' versions,
-    //and stays a dependency. newPackages may be empty when there are pins.
+    //and stays a dependency. A pin nothing in the project depends on is never resolved - it simply isn't in the result.
+    //Never a top level reference's id. newPackages may be empty when there are pins.
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>; const pinnedPackages : IList<IPackageInfo>) : boolean; overload;
   end;
 
