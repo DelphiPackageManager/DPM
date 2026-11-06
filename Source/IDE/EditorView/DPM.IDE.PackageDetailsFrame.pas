@@ -487,7 +487,10 @@ begin
   if packageMetadata <> nil then
   begin
     packageMetadata.Installed := true;
-    packageMetadata.IsTransitive := false;
+    //only an install makes the package a top level reference - an upgrade changes a dependency in place,
+    //so it stays shown as transitive.
+    if not options.IsUpgrade then
+      packageMetadata.IsTransitive := false;
   end;
   if FHost <> nil then
     FHost.PackageInstalled;
