@@ -193,9 +193,9 @@ end;
 //
 //end;
 
-//Installed as DPM.Core.Utils.Process.ProcessMessagePump so TProcess keeps the IDE responsive
+//Installed as DPM.Core.Utils.Process.ProcessMessagePump so TProcessRunner keeps the IDE responsive
 //while it blocks on the main thread waiting for a package compile to finish. In the CLI the
-//hook is never installed, so TProcess does a plain blocking wait.
+//hook is never installed, so the runner does a plain blocking wait.
 procedure DPMPumpMessages;
 begin
   if Application <> nil then

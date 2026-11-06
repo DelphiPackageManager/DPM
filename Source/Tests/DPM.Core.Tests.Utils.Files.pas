@@ -49,7 +49,7 @@ uses
   System.Types,
   Spring.Collections,
   VSoft.CancellationToken,
-  DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Utils.Directory,
   DPM.Core.Utils.Masks,
   DPM.Core.Utils.Files;
@@ -251,7 +251,7 @@ procedure TFileUtilsTests.GetFiles_Recursive_Does_Not_Follow_A_Junction;
 var
   outside : string;
   linkFolder : string;
-  exitCode : Cardinal;
+  process : IProcess;
   files : IList<string>;
 begin
   outside := TPath.Combine(FRoot, 'outside');
@@ -260,9 +260,10 @@ begin
   ForceDirectories(TPath.Combine(FRoot, 'walked'));
   TFile.WriteAllText(TPath.Combine(FRoot, 'walked\a.dpkg'), 'a');
   linkFolder := TPath.Combine(FRoot, 'walked\link');
-  exitCode := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, GetEnvironmentVariable('COMSPEC'),
-                                '/c mklink /J "' + linkFolder + '" "' + outside + '"', '');
-  Assert.IsTrue((exitCode = 0) and DirectoryExists(linkFolder), 'could not make the junction');
+  process := TProcess.Create;
+  process.StartInfo.Executable := GetEnvironmentVariable('COMSPEC');
+  process.CommandLine.Add('/c mklink /J "' + linkFolder + '" "' + outside + '"', TQuoted.qtNone);
+  Assert.IsTrue(process.Execute and (process.ExitCode = 0) and DirectoryExists(linkFolder), 'could not make the junction');
   try
     files := TDirectoryUtils.GetFiles(TPath.Combine(FRoot, 'walked'), '*.dpkg', TSearchOption.soAllDirectories);
     Assert.AreEqual(1, files.Count, 'the junction leads out of the folder - it is not followed');

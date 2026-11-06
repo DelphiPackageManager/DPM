@@ -101,7 +101,7 @@ uses
   DPM.Core.Utils.Files,
   DPM.Core.Utils.Hash,
   DPM.Core.Utils.PE,
-  DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Utils.Strings,
   DPM.Core.Diagnostics;
 
@@ -518,6 +518,8 @@ begin
 end;
 
 function TGithubUpgradeService.LaunchInstaller(const installerFile : string) : boolean;
+var
+  process : IProcess;
 begin
   result := false;
   if not TFile.Exists(installerFile) then
@@ -537,9 +539,19 @@ begin
     exit;
   end;
 
+  //Must not wait - the installer cannot replace our exe until we have exited. Detached, it also breaks away from any
+  //job DPM runs in, so it outlives dpm.exe. CreateProcess rather than ShellExecute is fine : the installer is Inno
+  //Setup with PrivilegesRequired=lowest, so it starts as the invoker and asks to elevate itself when it needs to.
   try
-    //Must not wait - the installer cannot replace our exe until we have exited.
-    TProcess.ExecuteNoWait(installerFile, '');
+    process := TProcess.Create;
+    process.StartInfo.Executable := installerFile;
+    process.StartInfo.WorkingDirectory := ExtractFileDir(installerFile);
+    process.StartInfo.HideWindow := false;
+    if not process.ExecuteDetached then
+    begin
+      Logger.Error(TErrorCode.E0304_UpgradeInstallerFailed, 'Unable to start the installer [' + installerFile + '] : ' + Trim(process.Errors.Text));
+      exit;
+    end;
     result := true;
   except
     on e : Exception do

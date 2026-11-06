@@ -49,11 +49,13 @@ implementation
 
 uses
   System.SysUtils,
+  System.Classes,
   System.StrUtils,
   System.IOUtils,
   VSoft.CancellationToken,
   DPM.Core.Logging,
   DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Project.CopyLocalTargets,
   TestLogger;
 
@@ -88,20 +90,29 @@ end;
 
 function RunMSBuild(const projectFile : string; const extraArgs : string; out output : string) : Cardinal;
 var
-  env : IEnvironmentBlock;
-  logFile : string;
+  process : IProcess;
+  lines : TStringList;
+  errorMessage : string;
 begin
-  env := TEnvironmentBlockFactory.Create(nil, true);
+  process := TProcess.Create;
+  process.StartInfo.Executable := MSBuildExe;
+  process.StartInfo.WorkingDirectory := ExtractFileDir(projectFile);
+  process.StartInfo.TimeoutInMSec := 120000;
+  process.CommandLine.Add('"' + projectFile + '" /nologo /nr:false /v:minimal ' + extraArgs, TQuoted.qtNone);
   //cmd only skips the current folder when this is set - make sure it isn't, as in an IDE.
-  env.RemoveVariable('NoDefaultCurrentDirectoryInExePath');
-  logFile := TPath.GetTempFileName;
+  process.Environment.Remove('NoDefaultCurrentDirectoryInExePath');
+  lines := TStringList.Create;
   try
-    result := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, MSBuildExe,
-                                '"' + projectFile + '" /nologo /nr:false /v:minimal ' + extraArgs,
-                                ExtractFileDir(projectFile), env, 120000, logFile);
-    output := TFile.ReadAllText(logFile);
+    if not TProcessRunner.Run(process, TCancellationTokenSourceFactory.Create.Token,
+      procedure(const line : string)
+      begin
+        lines.Add(line);
+      end, TEncoding.Default, errorMessage) then
+      raise Exception.Create('Unable to run msbuild : ' + errorMessage);
+    output := lines.Text;
+    result := process.ExitCode;
   finally
-    TFile.Delete(logFile);
+    lines.Free;
   end;
 end;
 

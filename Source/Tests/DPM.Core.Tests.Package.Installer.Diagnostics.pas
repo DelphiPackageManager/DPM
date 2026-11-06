@@ -190,7 +190,7 @@ uses
   Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Constants,
-  DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Types,
   DPM.Core.Diagnostics,
   DPM.Core.Logging,
@@ -1478,7 +1478,7 @@ var
   packageFolder : string;
   linkFolder : string;
   projectText : string;
-  exitCode : Cardinal;
+  process : IProcess;
   refreshed : boolean;
 begin
   logger := TTestLogger.Create;
@@ -1489,9 +1489,10 @@ begin
   TFile.WriteAllText(TPath.Combine(packageFolder, cGitPackageMarkerFile), 'abc', TEncoding.UTF8);
   //a link in the clone to a folder outside it - a junction needs no special rights to make.
   linkFolder := TPath.Combine(packageFolder, 'link');
-  exitCode := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, GetEnvironmentVariable('COMSPEC'),
-                                '/c mklink /J "' + linkFolder + '" "' + TPath.Combine(FTempFolder, 'outside') + '"', '');
-  Assert.IsTrue((exitCode = 0) and DirectoryExists(linkFolder), 'could not make the junction');
+  process := TProcess.Create;
+  process.StartInfo.Executable := GetEnvironmentVariable('COMSPEC');
+  process.CommandLine.Add('/c mklink /J "' + linkFolder + '" "' + TPath.Combine(FTempFolder, 'outside') + '"', TQuoted.qtNone);
+  Assert.IsTrue(process.Execute and (process.ExitCode = 0) and DirectoryExists(linkFolder), 'could not make the junction');
   try
     refreshed := RefreshSearchPaths(packageFolder, '      - src: ''**\*.pas''' + sLineBreak, loggerIntf, projectText);
     Assert.IsTrue(refreshed, logger.Messages.Text);
