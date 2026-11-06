@@ -49,10 +49,11 @@ type
   IPackageInstallerContext = interface;
 
   ///<summary> A project an upgrade leaves unchanged : the package is only a dependency there, and a package that depends
-  ///  on it doesn't accept the new version. </summary>
+  ///  on it doesn't accept the new version, or the new version clashes with the project's other packages. </summary>
   TPlanBlockedProject = record
     ProjectFile : string;
-    //'<parent id> <parent version> requires <id> <range>'
+    //'<parent id> <parent version> requires <id> <range>', or for a clash '<what blocks>, but <what it conflicts with>'
+    //(as a companion's reason).
     Reason : string;
   end;
 
@@ -80,7 +81,8 @@ type
     property Projects : IList<string> read GetProjects;
     //the projects where the package is only a dependency, changed in place under its parents.
     property TransitiveProjects : IList<string> read GetTransitiveProjects;
-    //the projects an upgrade leaves unchanged because a package depending on this one doesn't accept the version.
+    //the projects an upgrade leaves unchanged because a package depending on this one doesn't accept the version, or the
+    //version clashes with the project's other packages.
     property BlockedProjects : IList<TPlanBlockedProject> read GetBlockedProjects;
   end;
 
@@ -127,7 +129,8 @@ type
     ///  upgrade = false : every requested package is applied to every project.
     ///  upgrade = true (changing installed versions, up or down) : a package is applied to projects where
     ///  it is a top level reference, and changed in place where it is only a dependency when every package
-    ///  depending on it accepts the version. Other top level packages that would block the change (they pin a
+    ///  depending on it accepts the version and it works with the project's other packages - otherwise that
+    ///  project is left unchanged, and the plan says why. Other top level packages that would block the change (they pin a
     ///  dependency the requested packages need at another version) are added as companions, at their newest
     ///  compatible version - moving the same way as the requested packages, never the other way. </summary>
     function Plan(const cancellationToken : ICancellationToken; const config : IConfiguration; const options : TSearchOptions;

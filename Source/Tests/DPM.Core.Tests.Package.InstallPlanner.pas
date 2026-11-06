@@ -95,6 +95,7 @@ type
 
     [Test]
     procedure Companion_Needing_Minor_Bump_Lists_Versions_Once;
+
     [Test]
     procedure Upgrade_Changes_A_Dependency_In_Place;
 
@@ -109,6 +110,21 @@ type
 
     [Test]
     procedure Upgrade_Of_A_Parent_And_Its_Dependency_Changes_Both;
+
+    [Test]
+    procedure Upgrade_Changes_A_Top_Level_And_A_Dependency_In_One_Plan;
+
+    [Test]
+    procedure Upgrade_Leaves_A_Project_Whose_Packages_Clash_With_The_New_Version;
+
+    [Test]
+    procedure Upgrade_Judges_A_Parent_That_Moves_By_Its_New_Range;
+
+    [Test]
+    procedure Upgrade_Judges_A_Parent_Left_Unchanged_By_Its_Recorded_Range;
+
+    [Test]
+    procedure Upgrade_Of_A_Dependency_Its_Moving_Parent_Rejects_Fails_The_Plan;
   end;
 
 implementation
@@ -732,6 +748,176 @@ begin
   Assert.IsTrue(plan.Succeeded);
   Assert.AreEqual(1, plan.PackagesForProject(cApp).Count, 'Core');
   Assert.AreEqual(1, plan.PinsForProject(cApp).Count, 'Base');
+end;
+
+procedure TInstallPlannerTests.Upgrade_Changes_A_Top_Level_And_A_Dependency_In_One_Plan;
+var
+  root : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  // The case that found it : Base is a top level in app and only Core's dependency in tests. One upgrade changes
+  // it in both - app's top level reference, and tests' dependency in place.
+  root := AddProject(cApp);
+  AddPackage(root, 'Base', '1.0.1', '', []);
+  root := AddProject(cTests);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual(1, plan.PackagesForProject(cApp).Count, 'Base is a top level in app');
+  Assert.AreEqual('Base', plan.PackagesForProject(cApp)[0].Id, false);
+  Assert.AreEqual(0, plan.PinsForProject(cApp).Count, 'a top level is not pinned');
+  Assert.AreEqual(1, plan.PinsForProject(cTests).Count, 'Base is only a dependency in tests');
+  Assert.AreEqual('Base', plan.PinsForProject(cTests)[0].Id, false);
+  Assert.AreEqual(0, plan.PackagesForProject(cTests).Count, 'Base is not made a top level in tests');
+  Assert.AreEqual(2, plan.Projects.Count);
+  Assert.AreEqual(cApp, plan.Projects[0], false);
+  Assert.AreEqual(cTests, plan.Projects[1], false);
+  lines := plan.SummaryLines;
+  Assert.AreEqual(4, lines.Count);
+  Assert.AreEqual('Base 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('    tests.dproj (transitive)', lines[1], false);
+  Assert.AreEqual('', lines[2]);
+  Assert.AreEqual('Projects : app.dproj, tests.dproj', lines[3], false);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Leaves_A_Project_Whose_Packages_Clash_With_The_New_Version;
+var
+  root : IPackageReference;
+  core : IPackageReference;
+  tool : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  // Base 1.0.3 needs Util 2.0.0. Core accepts Base 1.0.3 in both projects, but in tests Tool pins Util 1.0.0 - Base
+  // can't change there without breaking Tool, so tests is left unchanged and the plan says why. app still changes.
+  FRepo.SetVersions('Util', ListOf([MakeInfo('Util', '1.0.0', []), MakeInfo('Util', '2.0.0', [])]));
+  root := AddProject(cApp);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+  root := AddProject(cTests);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+  tool := AddPackage(root, 'Tool', '1.0.0', '', ['Util', '1.0.0']);
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [MakeDep('Util', '2.0.0')])]);
+
+  Assert.IsTrue(plan.Succeeded, 'a project that can''t take the change is left unchanged - the plan still succeeds');
+  Assert.AreEqual(1, plan.PinsForProject(cApp).Count, 'app still changes');
+  Assert.AreEqual(0, plan.PinsForProject(cTests).Count, 'tests is left unchanged');
+  Assert.AreEqual(1, plan.Projects.Count);
+  Assert.AreEqual(cApp, plan.Projects[0], false);
+  lines := plan.SummaryLines;
+  Assert.AreEqual(6, lines.Count);
+  Assert.AreEqual('Base 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('    app.dproj (transitive)', lines[1], false);
+  Assert.AreEqual('    left unchanged in tests.dproj - Tool 1.0.0 requires Util 1.0.0,', lines[2], false);
+  Assert.AreEqual('      but Base 1.0.3 requires Util 2.0.0', lines[3], false);
+  Assert.AreEqual('', lines[4]);
+  Assert.AreEqual('Projects : app.dproj', lines[5], false);
+  Assert.IsNotNull(tool.FindFirstChild('Util'), 'the graph must not be changed');
+end;
+
+procedure TInstallPlannerTests.Upgrade_Judges_A_Parent_That_Moves_By_Its_New_Range;
+var
+  root : IPackageReference;
+  tool : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  // Core pins Base exactly, so upgrading Base in app (where both are top levels) moves Core with it. In tests Core
+  // is only Tool's dependency (any 1.0.x), with Base under it - Core changes in place there, so its new range on
+  // Base is what counts, not the old exact one : Base changes in place under it.
+  SetupFamily(['1.0.1', '1.0.3']);
+  root := AddProject(cApp);
+  AddPackage(root, 'Base', '1.0.1', '', []);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+  root := AddProject(cTests);
+  tool := AddPackage(root, 'Tool', '1.0.0', '', []);
+  core := tool.AddChild('Core', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('1.0.1'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.IsTrue(FindItem(plan, 'Core').IsCompanion, 'Core moves with Base');
+  Assert.AreEqual(2, plan.PackagesForProject(cApp).Count, 'Base and Core are top levels in app');
+  Assert.AreEqual(2, plan.PinsForProject(cTests).Count, 'Base and Core change in place in tests');
+  Assert.AreEqual(0, FindItem(plan, 'Base').BlockedProjects.Count, 'Core''s old range doesn''t block Base - Core moves too');
+  Assert.AreEqual(2, plan.Projects.Count);
+  lines := plan.SummaryLines;
+  Assert.AreEqual(8, lines.Count);
+  Assert.AreEqual('Base 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('    tests.dproj (transitive)', lines[1], false);
+  Assert.AreEqual('Core 1.0.1 -> 1.0.3 (also upgraded)', lines[2], false);
+  Assert.AreEqual('    Core 1.0.1 requires Base 1.0.1,', lines[3], false);
+  Assert.AreEqual('    but Base 1.0.3 is being installed', lines[4], false);
+  Assert.AreEqual('    tests.dproj (transitive)', lines[5], false);
+  Assert.AreEqual('', lines[6]);
+  Assert.AreEqual('Projects : app.dproj, tests.dproj', lines[7], false);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Judges_A_Parent_Left_Unchanged_By_Its_Recorded_Range;
+var
+  root : IPackageReference;
+  tool : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  // As above, but Tool pins Core 1.0.1 exactly - Core can't change in tests, so it keeps its old exact range on
+  // Base, and Base can't change there either. Both say why; tests is left unchanged.
+  SetupFamily(['1.0.1', '1.0.3']);
+  root := AddProject(cApp);
+  AddPackage(root, 'Base', '1.0.1', '', []);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+  root := AddProject(cTests);
+  tool := AddPackage(root, 'Tool', '1.0.0', '', []);
+  core := tool.AddChild('Core', MakeVersion('1.0.1'), MakeRange('1.0.1'));
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('1.0.1'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual(0, plan.PinsForProject(cTests).Count, 'tests is left unchanged');
+  Assert.AreEqual(1, plan.Projects.Count);
+  lines := plan.SummaryLines;
+  Assert.AreEqual(8, lines.Count);
+  Assert.AreEqual('Base 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('    left unchanged in tests.dproj - Core 1.0.1 requires Base 1.0.1', lines[1], false);
+  Assert.AreEqual('Core 1.0.1 -> 1.0.3 (also upgraded)', lines[2], false);
+  Assert.AreEqual('    Core 1.0.1 requires Base 1.0.1,', lines[3], false);
+  Assert.AreEqual('    but Base 1.0.3 is being installed', lines[4], false);
+  Assert.AreEqual('    left unchanged in tests.dproj - Tool 1.0.0 requires Core 1.0.1', lines[5], false);
+  Assert.AreEqual('', lines[6]);
+  Assert.AreEqual('Projects : app.dproj', lines[7], false);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Of_A_Dependency_Its_Moving_Parent_Rejects_Fails_The_Plan;
+var
+  root : IPackageReference;
+  tool : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+begin
+  // Core 1.0.3 needs Base 1.0.3, and Base 1.0.4 is asked for with it. A parent that moves with the plan can't
+  // reject the version - the plan's packages are resolved together first, so this fails the plan (E2007) rather
+  // than leaving a project out.
+  root := AddProject(cTests);
+  tool := AddPackage(root, 'Tool', '1.0.0', '', []);
+  core := tool.AddChild('Core', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('1.0.1'));
+
+  plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')]), MakeInfo('Base', '1.0.4', [])]);
+
+  Assert.IsFalse(plan.Succeeded, 'the packages asked for can''t be resolved together');
+  Assert.IsTrue(plan.Errors[0].Code = TErrorCode.E2007_PlanConflict, 'packages that can''t be resolved together are DPME2007');
+  Assert.AreEqual(0, plan.PinsForProject(cTests).Count, 'nothing is pinned');
 end;
 
 initialization

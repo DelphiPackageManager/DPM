@@ -155,11 +155,16 @@ type
     function BuildDemands : boolean;
     function CheckAgainstDemands(const id : string; const version : TPackageVersion) : string;
     function CheckEdges(const node : IPackageReference) : string;
+    function TopLevelBlockReason(const topLevel : IPackageReference) : string;
     procedure DetectBlockers(const project : TInstallPlanProject; const blockers : IDictionary<string, TBlocker>);
     function IsStaticallyCompatible(const candidate : IPackageInfo) : boolean;
     function TrialResolve(const candidate : IPackageInfo) : boolean;
     function PickCompanion(const blocker : TBlocker; const candidates : IList<IPackageInfo>) : IPackageInfo;
     function FindCompanion(const blocker : TBlocker) : IPackageInfo;
+    function PlanPackage(const id : string) : IPackageInfo;
+    function MovingParent(const parentId : string; const project : TInstallPlanProject; const inProgress : ISet<string>) : IPackageInfo;
+    function ParentsBlockReason(const packageInfo : IPackageInfo; const project : TInstallPlanProject; const inProgress : ISet<string>) : string;
+    function ProjectBlockReason(const project : TInstallPlanProject) : string;
     function AddTransitiveProject(const item : TInstallPlanItem; const project : TInstallPlanProject) : boolean;
     procedure PopulatePlan;
   public
@@ -437,7 +442,19 @@ begin
     for projectFile in item.TransitiveProjects do
       result.Add('    ' + ExtractFileName(projectFile) + ' (transitive)');
     for blocked in item.BlockedProjects do
-      result.Add('    left unchanged in ' + ExtractFileName(blocked.ProjectFile) + ' - ' + blocked.Reason);
+    begin
+      line := '    left unchanged in ' + ExtractFileName(blocked.ProjectFile) + ' - ';
+      //a clash with the project's other packages reads like a companion's reason - its second half goes on a
+      //line of its own, indented under the first.
+      separatorPos := Pos(cReasonSeparator, blocked.Reason);
+      if separatorPos > 0 then
+      begin
+        result.Add(line + Copy(blocked.Reason, 1, separatorPos));
+        result.Add('      ' + Copy(blocked.Reason, separatorPos + 2, Length(blocked.Reason)));
+      end
+      else
+        result.Add(line + blocked.Reason);
+    end;
   end;
   if FProjects.Any then
   begin
@@ -606,6 +623,14 @@ begin
   end;
 end;
 
+//'' when an installed top level package works with the plan, otherwise why not.
+function TUpgradePlanBuilder.TopLevelBlockReason(const topLevel : IPackageReference) : string;
+begin
+  result := CheckAgainstDemands(topLevel.Id, topLevel.Version);
+  if result = '' then
+    result := CheckEdges(topLevel);
+end;
+
 procedure TUpgradePlanBuilder.DetectBlockers(const project : TInstallPlanProject; const blockers : IDictionary<string, TBlocker>);
 var
   applied : boolean;
@@ -615,7 +640,8 @@ var
 begin
   if project.Graph = nil then
     exit;
-  //a project none of the plan's packages are installed in has nothing applied, so it can't block.
+  //a project none of the plan's packages are installed in as a top level has nothing applied, so it can't block.
+  //(Where they are only dependencies, the same checks leave the project unchanged instead - see ProjectBlockReason.)
   applied := false;
   for topLevel in project.Graph.Children do
   begin
@@ -632,9 +658,7 @@ begin
   begin
     if FPlanVersions.ContainsKey(LowerCase(topLevel.Id)) then
       continue;
-    reason := CheckAgainstDemands(topLevel.Id, topLevel.Version);
-    if reason = '' then
-      reason := CheckEdges(topLevel);
+    reason := TopLevelBlockReason(topLevel);
     if reason = '' then
       continue;
     if blockers.TryGetValue(LowerCase(topLevel.Id), blocker) then
@@ -813,45 +837,138 @@ begin
   end;
 end;
 
-//A project where the package is only a dependency : it changes in place, under its parents, when each of them
-//accepts the version - otherwise the project is left as it is, and the plan says why. A parent that is a top level
-//here and moves with the plan isn't asked - its new version's range is what counts, and the resolve checks that.
-//True when the project has the package at all (changing or not).
+//the plan's package with the id, nil when it isn't in the plan.
+function TUpgradePlanBuilder.PlanPackage(const id : string) : IPackageInfo;
+var
+  info : IPackageInfo;
+begin
+  result := nil;
+  for info in FPlanPackages do
+  begin
+    if SameText(info.Id, id) then
+      exit(info);
+  end;
+end;
+
+//The plan's package parentId when it moves in the project - a top level there, or a dependency its own parents let
+//change in place - nil when the parent keeps the version the project recorded (it isn't in the plan, or it is left
+//unchanged there). inProgress : see ParentsBlockReason.
+function TUpgradePlanBuilder.MovingParent(const parentId : string; const project : TInstallPlanProject; const inProgress : ISet<string>) : IPackageInfo;
+begin
+  result := PlanPackage(parentId);
+  if (result = nil) or (project.Graph.FindTopLevelChild(parentId) <> nil) then
+    exit;
+  if inProgress.Contains(LowerCase(parentId)) or (ParentsBlockReason(result, project, inProgress) <> '') then
+    result := nil;
+end;
+
+//'' when every package that depends on the plan's package in the project accepts its new version, otherwise why not :
+//'<parent id> <parent version> requires <id> <range>'. A parent that moves with the plan in the project is judged by
+//its new version's range - one that no longer depends on the package imposes nothing - and any other parent by the
+//range the project recorded. (BuildDemands resolved the plan's packages together, so a moving parent's new range
+//accepts the version in practice.) inProgress holds the packages being judged further up the call, so a cycle in a
+//recorded graph isn't followed round.
+function TUpgradePlanBuilder.ParentsBlockReason(const packageInfo : IPackageInfo; const project : TInstallPlanProject; const inProgress : ISet<string>) : string;
+var
+  key : string;
+  nodes : IList<IPackageReference>;
+  node : IPackageReference;
+  parent : IPackageReference;
+  newParent : IPackageInfo;
+  dependency : IPackageDependency;
+  range : TVersionRange;
+begin
+  result := '';
+  key := LowerCase(packageInfo.Id);
+  inProgress.Add(key);
+  try
+    nodes := project.Graph.FindChildren(packageInfo.Id);
+    for node in nodes do
+    begin
+      parent := node.Parent;
+      if (parent = nil) or parent.IsRoot then
+        continue;
+      newParent := MovingParent(parent.Id, project, inProgress);
+      if newParent <> nil then
+      begin
+        if newParent.Dependencies = nil then
+          continue;
+        for dependency in newParent.Dependencies do
+        begin
+          if not SameText(dependency.Id, packageInfo.Id) then
+            continue;
+          range := dependency.VersionRange;
+          if (not range.IsEmpty) and (not range.IsBundledSentinel) and (not range.IsSatisfiedBy(packageInfo.Version)) then
+            exit(newParent.Id + ' ' + newParent.Version.ToStringNoMeta + ' requires ' + node.Id + ' ' + range.ToString);
+        end;
+        continue;
+      end;
+      range := node.VersionRange;
+      if (not range.IsEmpty) and (not range.IsBundledSentinel) and (not range.IsSatisfiedBy(packageInfo.Version)) then
+        exit(parent.Id + ' ' + parent.Version.ToStringNoMeta + ' requires ' + node.Id + ' ' + range.ToString);
+    end;
+  finally
+    inProgress.Remove(key);
+  end;
+end;
+
+//'' when the project's own top level packages work with the plan, otherwise why not - the checks DetectBlockers makes,
+//for a project where the plan's packages are only dependencies. Nothing moves that project's other packages along
+//(companions are only looked for where a plan package is a top level), so a clash leaves it unchanged. CheckEdges
+//stops at a plan package - its old dependencies don't count, it is being replaced.
+function TUpgradePlanBuilder.ProjectBlockReason(const project : TInstallPlanProject) : string;
+var
+  topLevel : IPackageReference;
+begin
+  result := '';
+  for topLevel in project.Graph.Children do
+  begin
+    if FPlanVersions.ContainsKey(LowerCase(topLevel.Id)) then
+      continue;
+    result := TopLevelBlockReason(topLevel);
+    if result <> '' then
+      exit;
+  end;
+end;
+
+//A project where the package is only a dependency : it changes in place, under its parents, when each of them accepts
+//the version (see ParentsBlockReason) and the version works with the project's other packages (see
+//ProjectBlockReason) - otherwise the project is left as it is, and the plan says why. True when the project has the
+//package at all (changing or not).
 function TUpgradePlanBuilder.AddTransitiveProject(const item : TInstallPlanItem; const project : TInstallPlanProject) : boolean;
 var
   nodes : IList<IPackageReference>;
   node : IPackageReference;
-  parent : IPackageReference;
-  version : TPackageVersion;
   changes : boolean;
-  parentMoves : boolean;
+  inProgress : ISet<string>;
+  reason : string;
   blocked : TPlanBlockedProject;
 begin
   nodes := project.Graph.FindChildren(item.FPackageInfo.Id);
   result := nodes.Any;
   if not result then
     exit;
-  version := item.FPackageInfo.Version;
+  //already at the version everywhere in the project - there is nothing to change.
   changes := false;
   for node in nodes do
   begin
-    parent := node.Parent;
-    if (parent = nil) or parent.IsRoot then
-      continue;
-    parentMoves := FPlanVersions.ContainsKey(LowerCase(parent.Id)) and (project.Graph.FindTopLevelChild(parent.Id) <> nil);
-    if (not parentMoves) and (not node.VersionRange.IsEmpty) and (not node.VersionRange.IsBundledSentinel) and
-       (not node.VersionRange.IsSatisfiedBy(version)) then
-    begin
-      blocked.ProjectFile := project.ProjectFile;
-      blocked.Reason := parent.Id + ' ' + parent.Version.ToStringNoMeta + ' requires ' + node.Id + ' ' + node.VersionRange.ToString;
-      item.FBlockedProjects.Add(blocked);
-      exit;
-    end;
-    if node.Version <> version then
+    if node.Version <> item.FPackageInfo.Version then
       changes := true;
   end;
   if not changes then
     exit;
+
+  inProgress := TCollections.CreateSet<string>;
+  reason := ParentsBlockReason(item.FPackageInfo, project, inProgress);
+  if reason = '' then
+    reason := ProjectBlockReason(project);
+  if reason <> '' then
+  begin
+    blocked.ProjectFile := project.ProjectFile;
+    blocked.Reason := reason;
+    item.FBlockedProjects.Add(blocked);
+    exit;
+  end;
   item.FTransitiveProjects.Add(project.ProjectFile);
   for node in nodes do
     item.AddCurrentVersion(node.Version);
