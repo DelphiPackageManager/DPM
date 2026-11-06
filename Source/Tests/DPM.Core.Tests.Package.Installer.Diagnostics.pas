@@ -165,6 +165,15 @@ type
     [Test]
     procedure Restore_Does_Not_Warn_When_Another_Project_Uses_The_Same_Version;
 
+    //An upgrade of a package the project only has as a dependency changes it in place, and leaves the project alone
+    //when the package depending on it doesn't accept the version.
+    [Test]
+    procedure Upgrade_Changes_A_Dependency_In_Place;
+    [Test]
+    procedure Upgrade_Pin_Is_Not_Overridden_By_Another_Project;
+    [Test]
+    procedure Upgrade_Leaves_The_Project_When_The_Parent_Rejects_The_Version;
+
     //With no compiler given, each project in a group is restored (or uninstalled from) for its own compiler -
     //not the one the first project was for.
     [Test]
@@ -993,11 +1002,13 @@ end;
 //own folder with the spec given - or the one in specOverrides (lowercase id -> spec, may be nil) - whose receipts say
 //they are cFooHash, cBarHash and cBazHash - with projectFile, holding the project text given, beside them. Their
 //builds fail for failPlatforms. The sources have all three - the cache has no package info for those in uncachedIds,
-//as for a package not downloaded yet. repository is the fake the installer uses.
-function NewLockedFixtureWith(const tempFolder : string; const logger : ILogger; const project : string;
+//as for a package not downloaded yet. repository is the fake the installer uses. extraVersions are further versions of
+//those packages the sources have (and the cache, unless uncached).
+function NewLockedFixtureWithVersions(const tempFolder : string; const logger : ILogger; const project : string;
                               const fooDependencies : array of IPackageDependency; const spec : string;
                               const specOverrides : IDictionary<string, string>; const uncachedIds : array of string;
                               const failPlatforms : TDPMPlatforms; const context : IPackageInstallerContext;
+                              const extraVersions : array of IPackageInfo;
                               out projectFile : string; out repository : TFakeRepositoryManager) : IPackageInstaller;
 
   function IsUncached(const info : IPackageInfo) : boolean;
@@ -1023,6 +1034,8 @@ var
   fooInfo, barInfo, bazInfo : IPackageInfo;
   id : string;
   overridePair : TPair<string, string>;
+  fooList, barList, bazList : IList<IPackageInfo>;
+  i : integer;
 begin
   root := TPath.Combine(tempFolder, 'locks');
   if DirectoryExists(root) then
@@ -1042,9 +1055,21 @@ begin
   repo := TFakeRepositoryManager.Create;
   repoIntf := repo;
   repository := repo;
-  repo.SetVersions('VSoft.Foo', ListOf([fooInfo]));
-  repo.SetVersions('VSoft.Bar', ListOf([barInfo]));
-  repo.SetVersions('VSoft.Baz', ListOf([bazInfo]));
+  fooList := ListOf([fooInfo]);
+  barList := ListOf([barInfo]);
+  bazList := ListOf([bazInfo]);
+  for i := 0 to High(extraVersions) do
+  begin
+    if SameText(extraVersions[i].Id, 'VSoft.Foo') then
+      fooList.Add(extraVersions[i])
+    else if SameText(extraVersions[i].Id, 'VSoft.Bar') then
+      barList.Add(extraVersions[i])
+    else if SameText(extraVersions[i].Id, 'VSoft.Baz') then
+      bazList.Add(extraVersions[i]);
+  end;
+  repo.SetVersions('VSoft.Foo', fooList);
+  repo.SetVersions('VSoft.Bar', barList);
+  repo.SetVersions('VSoft.Baz', bazList);
   reader := TPackageSpecReader.Create(logger);
   cache := TPerPackageCache.Create(root, reader.ReadSpecString(spec));
   cacheIntf := cache;
@@ -1057,6 +1082,9 @@ begin
     cache.RegisterInfo(barInfo);
   if not IsUncached(bazInfo) then
     cache.RegisterInfo(bazInfo);
+  for i := 0 to High(extraVersions) do
+    if not IsUncached(extraVersions[i]) then
+      cache.RegisterInfo(extraVersions[i]);
   receipts := TFakeReceiptService.Create;
   receiptsIntf := receipts;
   receipts.SetHash(TPath.Combine(root, 'VSoft.Foo'), cFooHash);
@@ -1069,6 +1097,16 @@ begin
                                      TInstallPlanner.Create(logger, repoIntf, cacheIntf));
   BuildCount := 0;
   BuiltProjects := TCollections.CreateList<string>;
+end;
+
+function NewLockedFixtureWith(const tempFolder : string; const logger : ILogger; const project : string;
+                              const fooDependencies : array of IPackageDependency; const spec : string;
+                              const specOverrides : IDictionary<string, string>; const uncachedIds : array of string;
+                              const failPlatforms : TDPMPlatforms; const context : IPackageInstallerContext;
+                              out projectFile : string; out repository : TFakeRepositoryManager) : IPackageInstaller;
+begin
+  result := NewLockedFixtureWithVersions(tempFolder, logger, project, fooDependencies, spec, specOverrides, uncachedIds,
+                                         failPlatforms, context, [], projectFile, repository);
 end;
 
 function NewLockedFixture(const tempFolder : string; const logger : ILogger; const project : string;
@@ -2601,6 +2639,96 @@ begin
   (context as TFakeInstallerContext).SeedResolutions(cOtherProject,
     [TResolvedPackage.Create(MakeInfo('VSoft.Bar', otherBarVersion, []), MakeRange(otherBarVersion), cRootNode, cOtherProject)]);
   result := RestoreForWin32(installer, context, projectFile);
+end;
+
+//how many times sub is in text.
+function Occurrences(const sub : string; const text : string) : integer;
+var
+  position : integer;
+begin
+  result := 0;
+  position := PosEx(sub, text, 1);
+  while position > 0 do
+  begin
+    Inc(result);
+    position := PosEx(sub, text, position + Length(sub));
+  end;
+end;
+
+//Upgrades VSoft.Bar to 1.0.1 (in the sources and the cache too) in the locked consumer project, where VSoft.Bar is
+//only VSoft.Foo's dependency and VSoft.Foo declares (and the project records) barRange. otherBarVersion, when not '',
+//is the version cOtherProject - not in the upgrade - uses. projectText is the project afterwards.
+function UpgradeBarInLockedProject(const tempFolder : string; const logger : ILogger; const barRange : string;
+                                   const otherBarVersion : string; out projectText : string) : boolean;
+var
+  projectFile : string;
+  context : IPackageInstallerContext;
+  repository : TFakeRepositoryManager;
+  installer : IPackageInstaller;
+  options : TInstallOptions;
+begin
+  context := TFakeInstallerContext.Create(logger);
+  if otherBarVersion <> '' then
+    (context as TFakeInstallerContext).SeedResolutions(cOtherProject,
+      [TResolvedPackage.Create(MakeInfo('VSoft.Bar', otherBarVersion, []), MakeRange(otherBarVersion), cRootNode, cOtherProject)]);
+  installer := NewLockedFixtureWithVersions(tempFolder, logger,
+                 StringReplace(LockedConsumerProject(cBarHash), 'range="1.0.0"', 'range="' + barRange + '"', []),
+                 [MakeDep('VSoft.Bar', barRange)], cPackageSpec, nil, [], [], context, [MakeInfo('VSoft.Bar', '1.0.1', [])],
+                 projectFile, repository);
+  options := TInstallOptions.Create;
+  try
+    options.ProjectPath := projectFile;
+    options.CompilerVersion := cTestCompiler;
+    options.ConfigFile := 'dpm.config.yaml';
+    options.Platforms := [TDPMPlatform.Win32];
+    options.IsUpgrade := true;
+    options.AddPackage('VSoft.Bar', TPackageVersion.Parse('1.0.1'));
+    result := installer.Install(TCancellationTokenSourceFactory.Create.Token, options, context);
+  finally
+    options.Free;
+  end;
+  projectText := TFile.ReadAllText(projectFile);
+end;
+
+procedure TInstallerDiagnosticsTests.Upgrade_Changes_A_Dependency_In_Place;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(UpgradeBarInLockedProject(FTempFolder, loggerIntf, '[1.0.0,]', '', projectText), logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsTrue(Pos('id="VSoft.Bar" version="1.0.1" range=', projectText) > 0, projectText);
+  Assert.AreEqual(1, Occurrences('id="VSoft.Bar"', projectText), 'not also a top level : ' + projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Upgrade_Pin_Is_Not_Overridden_By_Another_Project;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(UpgradeBarInLockedProject(FTempFolder, loggerIntf, '[1.0.0,]', '1.0.0', projectText), logger.Messages.Text);
+  Assert.IsTrue(Pos('id="VSoft.Bar" version="1.0.1"', projectText) > 0, projectText);
+end;
+
+procedure TInstallerDiagnosticsTests.Upgrade_Leaves_The_Project_When_The_Parent_Rejects_The_Version;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  projectText : string;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsFalse(UpgradeBarInLockedProject(FTempFolder, loggerIntf, '1.0.0', '', projectText), logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E3001_NothingToInstall), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('information', 'left unchanged in Consumer.dproj - VSoft.Foo 1.0.0 requires VSoft.Bar 1.0.0'), logger.Messages.Text);
+  Assert.AreEqual(0, BuildCount, 'nothing is rebuilt');
+  Assert.IsTrue(Pos('id="VSoft.Bar" version="1.0.0"', projectText) > 0, projectText);
 end;
 
 procedure TInstallerDiagnosticsTests.Restore_Warns_When_Another_Project_Uses_A_Different_Version;

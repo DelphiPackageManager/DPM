@@ -71,6 +71,7 @@ type
     FOptions : TInstallOptions;
     FPlatforms : TDPMPlatforms;
     FPackages : IList<IPackageInfo>;
+    FPins : IList<IPackageInfo>;
     FGraph : IPackageReference;
     FResolved : IList<IPackageInfo>;
     FLocks : IDictionary<string, TRecordedLock>;
@@ -86,6 +87,8 @@ type
     property Platforms : TDPMPlatforms read FPlatforms;
     //the packages to apply to the project.
     property Packages : IList<IPackageInfo> read FPackages write FPackages;
+    //the packages to change in place - the project has them only as dependencies.
+    property Pins : IList<IPackageInfo> read FPins write FPins;
     //what resolving the project produced.
     property Graph : IPackageReference read FGraph write FGraph;
     property Resolved : IList<IPackageInfo> read FResolved write FResolved;
@@ -1550,6 +1553,7 @@ begin
   FOptions := options;
   FPlatforms := platforms;
   FPackages := TCollections.CreateList<IPackageInfo>;
+  FPins := TCollections.CreateList<IPackageInfo>;
   FDesignHostNotBuilt := TCollections.CreateSet<string>;
 end;
 
@@ -3185,6 +3189,7 @@ begin
   for work in works do
   begin
     work.Packages := plan.PackagesForProject(work.ProjectFile);
+    work.Pins := plan.PinsForProject(work.ProjectFile);
     projectFiles.Add(work.ProjectFile);
   end;
 
@@ -3258,6 +3263,13 @@ begin
       ids := ids + ', ';
     ids := ids + packageInfo.Id + '-' + packageInfo.Version.ToStringNoMeta;
   end;
+  for packageInfo in work.Pins do
+  begin
+    excludeIds.Add(LowerCase(packageInfo.Id));
+    if ids <> '' then
+      ids := ids + ', ';
+    ids := ids + packageInfo.Id + '-' + packageInfo.Version.ToStringNoMeta + ' (transitive)';
+  end;
   FLogger.Information('Resolving [' + ids + '] for [' + work.ProjectFile + ']', true);
 
   projectGraph := work.Editor.GetPackageReferences; // can return nil
@@ -3267,14 +3279,15 @@ begin
   //The project's locks on the packages it keeps still apply - the packages being installed get new ones.
   work.Locks := CollectGraphLocks(projectGraph, excludeIds);
 
-  //The packages being installed replace any reference to them, top level or transitive, so they (and
-  //anything only reachable through them) are left out of the references the resolver starts from.
+  //The packages being installed, and the pins (dependencies being changed in place), replace any reference to them,
+  //top level or transitive, so they (and anything only reachable through them) are left out of the references the
+  //resolver starts from.
   projectReferences := TCollections.CreateList<IPackageReference>;
   if not CreateProjectRefs(cancellationToken, projectGraph, excludeIds, projectReferences) then
     exit;
 
   if not FDependencyResolver.ResolveForInstall(cancellationToken, work.Options.CompilerVersion, work.ProjectFile, work.Options, work.Packages,
-                                               projectReferences, resolvedGraph, resolved, nil, nil, nil) then
+                                               projectReferences, resolvedGraph, resolved, nil, nil, nil, work.Pins) then
     exit;
 
   // Install-specific sanity check: every package being installed must be in the resolved list
@@ -3287,6 +3300,21 @@ begin
       end) then
     begin
       FLogger.Error(TErrorCode.E0003_InternalError, 'The resolver did not return the package being installed [' + packageInfo.Id + '].');
+      exit;
+    end;
+  end;
+
+  //A pin the resolve kept must be at its version - one nothing needs any more (its parent's new version dropped it) simply goes.
+  for packageInfo in work.Pins do
+  begin
+    if resolved.Any(
+      function(const info : IPackageInfo) : boolean
+      begin
+        result := SameText(info.Id, packageInfo.Id) and (info.Version <> packageInfo.Version);
+      end) then
+    begin
+      FLogger.Error(TErrorCode.E0003_InternalError, 'The resolver did not keep [' + packageInfo.Id + '-' +
+                    packageInfo.Version.ToStringNoMeta + '] the project''s dependency is being changed to.');
       exit;
     end;
   end;
