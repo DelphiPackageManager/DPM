@@ -225,6 +225,10 @@ type
     //conflicts (optional) : receives every conflict found, so the caller can report or act on them.
     //Resolutions are only recorded in the installer context when the resolve succeeds.
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean; overload;
+    //pinnedPackages : packages to change in place where the project has them only as dependencies (an upgrade of a
+    //transitive package) - each is the only version tried for its id, ahead of the lock and of other projects' versions,
+    //and stays a dependency. newPackages may be empty when there are pins.
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>; const pinnedPackages : IList<IPackageInfo>) : boolean; overload;
   end;
 
 

@@ -61,6 +61,7 @@ type
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>) : boolean; overload;
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackage : IPackageInfo; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>) : boolean; overload;
     function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean; overload;
+    function ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>; const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference; out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>; const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>; const pinnedPackages : IList<IPackageInfo>) : boolean; overload;
 
   public
     constructor Create(const logger : ILogger; const repositoryManager : IPackageRepositoryManager; const packageCache : IPackageCache; const packageInstallerContext : IPackageInstallerContext);
@@ -364,8 +365,15 @@ procedure TResolveSearch.ChooseFor(const requirement : TRequirement; const owner
 var
   dependency : IPackageDependency;
   sibling : IResolvedPackage;
+  pinned : IPackageInfo;
 begin
   dependency := requirement.Dependency;
+  //an upgrade asked for this version - another project's isn't adopted.
+  if FContext.TryGetPin(dependency.Id, pinned) then
+  begin
+    Decide(requirement, owner);
+    exit;
+  end;
   //the projects in a group share one version of a package - another project's is the one.
   sibling := FContext.FindSiblingResolution(dependency.Id);
   if sibling <> nil then
@@ -403,6 +411,7 @@ var
   owner : TAssignment;
   assignment : TAssignment;
   sibling : IResolvedPackage;
+  pinned : IPackageInfo;
 begin
   //Checked once everything else is. Satisfied by any real package with the id - a top level, a transient, or
   //another project's - at whatever version; only when there is none is it the IDE's own (a no-op).
@@ -411,6 +420,12 @@ begin
     exit;
   if (not FContext.TryGetAssignment(requirement.Owner.Id, owner)) or (owner.PackageInfo <> requirement.Owner) then
     exit;
+  if FContext.TryGetPin(id, pinned) then
+  begin
+    FContext.Assign(MakeAssignment(pinned, akChosen, owner.Responsible, owner.PackageInfo.Id, requirement.Dependency.VersionRange));
+    FContext.Require(pinned);
+    exit;
+  end;
   sibling := FContext.FindSiblingResolution(id);
   if sibling <> nil then
   begin
@@ -521,8 +536,18 @@ var
   identity : IPackageIdentity;
   key : string;
   unavailable : string;
+  pinned : IPackageInfo;
 begin
   dependency := decision.Requirement.Dependency;
+  //an upgrade asked for this version - it is the only one tried, whatever the lock, the cache or the prerelease setting.
+  if FContext.TryGetPin(dependency.Id, pinned) then
+  begin
+    decision.Tier := 3;
+    versions := TCollections.CreateList<IPackageInfo>;
+    versions.Add(pinned);
+    AddCandidates(decision, versions);
+    exit;
+  end;
   Inc(decision.Tier);
   case decision.Tier of
     1 :
@@ -601,6 +626,7 @@ var
   excludedByConstraint : boolean;
   allExcludedByConstraints : boolean;
   conflictingRanges : string;
+  pinned : IPackageInfo;
 begin
   owner := decision.Requirement.Owner;
   dependency := decision.Requirement.Dependency;
@@ -610,7 +636,12 @@ begin
   if decision.Candidates.Count = 0 then
   begin
     levels.AddAll(decision.OwnerResponsible);
-    if decision.SourcesUnavailable <> '' then
+    if FContext.TryGetPin(dependency.Id, pinned) then
+      failure := MakeFailure(TErrorCode.E2001_DependencyUnsatisfiable, 'Unable to satisfy dependency : ' + owner.Id + ' -> ' + dependency.Id + ' ' +
+                             dependency.VersionRange.ToString + ' - the upgrade asks for ' + pinned.Id + '-' + pinned.Version.ToStringNoMeta +
+                             ', which is outside that range.', dependency.Id, owner.Id, dependency.VersionRange,
+                             'the pinned version ' + pinned.Version.ToStringNoMeta + ' is outside the range')
+    else if decision.SourcesUnavailable <> '' then
       failure := MakeFailure(TErrorCode.E1102_PackageNotFoundSourcesUnavailable, 'Unable to satisfy dependency : ' + owner.Id + ' -> ' + dependency.Id + ' ' +
                              dependency.VersionRange.ToString + ' - the source(s) [' + decision.SourcesUnavailable + '] could not be used, see the warning(s) above.',
                              dependency.Id, owner.Id, dependency.VersionRange,
@@ -919,6 +950,19 @@ function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancel
                                                out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
                                                const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>) : boolean;
 var
+  noPins : IList<IPackageInfo>;
+begin
+  noPins := nil;
+  result := ResolveForInstall(cancellationToken, compilerVersion, projectFile, options, newPackages, projectReferences, dependencyGraph, resolved, sharedVersionCache, preferredVersions, conflicts, noPins);
+end;
+
+function TDependencyResolver.ResolveForInstall(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
+                                               const projectFile : string; const options : TSearchOptions; const newPackages : IList<IPackageInfo>;
+                                               const projectReferences : IList<IPackageReference>; out dependencyGraph : IPackageReference;
+                                               out resolved : IList<IPackageInfo>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
+                                               const preferredVersions : IDictionary<string, TPackageVersion>; const conflicts : IList<TUnresolvableConflict>;
+                                               const pinnedPackages : IList<IPackageInfo>) : boolean;
+var
   packageRef : IPackageReference;
   resolution : IResolvedPackage;
   context : TResolverContext;
@@ -946,14 +990,14 @@ begin
 
   stopwatch := TStopwatch.StartNew;
   FLogger.Verbose('Starting dependency resolution...');
-  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion, newPackages, projectReferences, sharedVersionCache, preferredVersions);
+  context := TResolverContext.Create(FLogger, FPackageInstallerContext, projectFile, compilerVersion, newPackages, projectReferences, sharedVersionCache, preferredVersions, pinnedPackages);
   try
     //NuGet-style prerelease handling, decided once for the whole resolve : the user's flag, or any top level
     //being a prerelease (installing Foo 1.0.0-beta turns it on, as NuGet does). Deciding it per package lets a
     //stable sibling resolve a transient as stable while a prerelease one resolves it as prerelease - two
     //versions of the same id in one resolve.
     search := TResolveSearch.Create(FLogger, FRepositoryManager, FPackageCache, cancellationToken, context,
-                                    options.Prerelease or context.AnyTopLevelIsPrerelease, FMaxSteps);
+                                    options.Prerelease or context.AnyTopLevelIsPrerelease or context.AnyPinIsPrerelease, FMaxSteps);
     try
       result := search.Run;
       FLastStepCount := search.Steps;

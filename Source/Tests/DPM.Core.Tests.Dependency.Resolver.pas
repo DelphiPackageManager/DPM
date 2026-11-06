@@ -258,6 +258,15 @@ type
     procedure T16_Unavoidable_Conflict_Is_Reported_Once;
     [Test]
     procedure T17_Transient_The_New_Version_Drops_Is_Not_Output;
+    //pins : an upgrade changes a package the project has only as a dependency, in place.
+    [Test]
+    procedure Pin_Is_Chosen_Over_The_Lock_And_Another_Projects_Version;
+    [Test]
+    procedure Pin_Outside_The_Declared_Range_Fails;
+    [Test]
+    procedure Pin_Dependencies_Are_Resolved;
+    [Test]
+    procedure Prerelease_Pin_Turns_On_Prerelease_For_Its_Dependencies;
   end;
 
 implementation
@@ -2682,6 +2691,154 @@ begin
   Assert.AreEqual('', VersionOf(resolved, 'X'), 'X was only needed by the A being replaced');
   Assert.IsNull(graph.FindFirstChild('X'));
   Assert.AreEqual(1, resolved.Count);
+end;
+
+procedure TDependencyResolverTests.Pin_Is_Chosen_Over_The_Lock_And_Another_Projects_Version;
+var
+  a, c3, c5 : IPackageInfo;
+  preferred : IDictionary<string, TPackageVersion>;
+  noNewPackages : IList<IPackageInfo>;
+  pins : IList<IPackageInfo>;
+  root : IPackageReference;
+  aRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  aNode : IPackageReference;
+  ok : boolean;
+begin
+  // A (a top level) depends on C. The lock says C 1.0.3 and another project in the group uses C 1.0.3 - the upgrade
+  // pins C 1.0.5. The pin wins, and C stays A's dependency.
+  c3 := MakeInfo('C', '1.0.3', []);
+  c5 := MakeInfo('C', '1.0.5', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[1.0.0,]')]);
+  FRepo.SetVersions('C', ListOf([c3, c5]));
+  FContext.SeedResolutions('C:\test\sibling.dproj', [TResolvedPackage.Create(c3, MakeRange('1.0.3'), cRootNode, 'C:\test\sibling.dproj')]);
+  preferred := TCollections.CreateDictionary<string, TPackageVersion>;
+  preferred.Add('c', MakeVersion('1.0.3'));
+  noNewPackages := TCollections.CreateList<IPackageInfo>;
+  pins := ListOf([c5]);
+  //A under a root that stays alive - MakeTopLevelRef's root is freed when it returns (the parent link is weak), and
+  //A would no longer be a top level.
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a.Id, a.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, noNewPackages, projectRefs, graph, resolved,
+                                    nil, preferred, nil, pins);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('1.0.5', VersionOf(resolved, 'C'), 'the pinned version');
+  Assert.IsNull(graph.FindTopLevelChild('C'), 'a pinned package stays a dependency');
+  aNode := graph.FindTopLevelChild('A');
+  Assert.IsNotNull(aNode, 'A is still a top level');
+  Assert.IsNotNull(aNode.FindTopLevelChild('C'), 'C is under A');
+  Assert.AreEqual('1.0.5', aNode.FindTopLevelChild('C').Version.ToStringNoMeta);
+end;
+
+procedure TDependencyResolverTests.Pin_Outside_The_Declared_Range_Fails;
+var
+  a, c3, c5 : IPackageInfo;
+  noNewPackages : IList<IPackageInfo>;
+  pins : IList<IPackageInfo>;
+  root : IPackageReference;
+  aRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // A needs C 1.0.0 - 1.0.4 but the upgrade pins C 1.0.5 : there is no way to honour both.
+  c3 := MakeInfo('C', '1.0.3', []);
+  c5 := MakeInfo('C', '1.0.5', []);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[1.0.0,1.0.4]')]);
+  FRepo.SetVersions('C', ListOf([c3, c5]));
+  noNewPackages := TCollections.CreateList<IPackageInfo>;
+  pins := ListOf([c5]);
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a.Id, a.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, noNewPackages, projectRefs, graph, resolved,
+                                    nil, nil, nil, pins);
+
+  Assert.IsFalse(ok);
+  Assert.IsTrue((FLogger as TTestLogger).HasError(TErrorCode.E2001_DependencyUnsatisfiable), LogText(FLogger));
+  Assert.IsTrue(Pos('C-1.0.5', LogText(FLogger)) > 0, 'the error names the pinned version : ' + LogText(FLogger));
+end;
+
+procedure TDependencyResolverTests.Pin_Dependencies_Are_Resolved;
+var
+  a, c5, d : IPackageInfo;
+  noNewPackages : IList<IPackageInfo>;
+  pins : IList<IPackageInfo>;
+  root : IPackageReference;
+  aRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // The pinned C 1.0.5 has a dependency of its own (D) that the project never had - it is resolved as a dependency.
+  d := MakeInfo('D', '1.0.2', []);
+  c5 := MakeInfo('C', '1.0.5', [MakeDep('D', '[1.0.0,]')]);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[1.0.0,]')]);
+  FRepo.SetVersions('D', ListOf([d]));
+  FRepo.SetVersions('C', ListOf([c5]));
+  noNewPackages := TCollections.CreateList<IPackageInfo>;
+  pins := ListOf([c5]);
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a.Id, a.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, noNewPackages, projectRefs, graph, resolved,
+                                    nil, nil, nil, pins);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('1.0.5', VersionOf(resolved, 'C'));
+  Assert.AreEqual('1.0.2', VersionOf(resolved, 'D'));
+  Assert.IsNull(graph.FindTopLevelChild('D'), 'D is a dependency, not a top level');
+end;
+
+procedure TDependencyResolverTests.Prerelease_Pin_Turns_On_Prerelease_For_Its_Dependencies;
+var
+  a, c5, d : IPackageInfo;
+  noNewPackages : IList<IPackageInfo>;
+  pins : IList<IPackageInfo>;
+  root : IPackageReference;
+  aRef : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  ok : boolean;
+begin
+  // Pinning a prerelease C turns prerelease on for the whole resolve (as a prerelease top level does), so C's
+  // prerelease-only dependency D is found.
+  d := MakeInfo('D', '1.0.1-beta.1', []);
+  c5 := MakeInfo('C', '1.0.5-beta.1', [MakeDep('D', '[1.0.0-beta.1,]')]);
+  a := MakeInfo('A', '1.0.0', [MakeDep('C', '[1.0.0-beta.1,]')]);
+  FRepo.SetVersions('D', ListOf([d]));
+  FRepo.SetVersions('C', ListOf([c5]));
+  FOptions.Prerelease := false;
+  noNewPackages := TCollections.CreateList<IPackageInfo>;
+  pins := ListOf([c5]);
+  root := TPackageReference.CreateRoot(cTestCompiler);
+  aRef := root.AddChild(a.Id, a.Version, MakeRange('1.0.0'));
+  aRef.PackageInfo := a;
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(aRef);
+
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, noNewPackages, projectRefs, graph, resolved,
+                                    nil, nil, nil, pins);
+
+  Assert.IsTrue(ok, LogText(FLogger));
+  Assert.AreEqual('1.0.1-beta.1', VersionOf(resolved, 'D'));
 end;
 
 initialization

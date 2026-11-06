@@ -133,6 +133,8 @@ type
     FProjectReferenceVersions : IDictionary<string, TPackageVersion>;
     //the top levels, in the order they go in the graph : the project's, then the new ones.
     FTopLevels : IList<string>;
+    //lowercase id -> the package an upgrade pins it to.
+    FPins : IDictionary<string, IPackageInfo>;
     FSortedDependencies : IDictionary<IPackageInfo, IList<IPackageDependency>>;
     procedure SetAssignment(const packageId : string; const assignment : TAssignment);
     procedure AddConstraints(const assignment : TAssignment);
@@ -144,10 +146,13 @@ type
     /// time) - nil for a cache of its own.
     /// preferredVersions : lock-file style hints (id -> version) tried before anything else - restore passes
     /// the project's graph, install nil.
+    /// pinnedPackages : packages an upgrade changes in place where the project has them only as dependencies - each
+    /// is the only version tried for its id and stays a dependency. May be nil; newPackages may be empty when there
+    /// are pins.
     constructor Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string;
                        const compilerVersion : TCompilerVersion; const newPackages : IList<IPackageInfo>;
                        const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
-                       const preferredVersions : IDictionary<string, TPackageVersion>);
+                       const preferredVersions : IDictionary<string, TPackageVersion>; const pinnedPackages : IList<IPackageInfo>);
 
     function TryGetAssignment(const packageId : string; out assignment : TAssignment) : boolean;
     //puts the assignment in the solution, replacing any with its id - undone by UndoTo.
@@ -179,6 +184,9 @@ type
     ///  made inconsistent from one that already was.
     function IsUnchanged(const assignment : TAssignment) : boolean;
     function AnyTopLevelIsPrerelease : boolean;
+    //the package an upgrade pins packageId to (id as written), false when there is no pin.
+    function TryGetPin(const packageId : string; out pinned : IPackageInfo) : boolean;
+    function AnyPinIsPrerelease : boolean;
 
     //What the solution holds, reachable from the top levels, dependencies before the packages that need them.
     //(A choice that was given up is not in it, nor anything only it needed.)
@@ -298,16 +306,19 @@ end;
 constructor TResolverContext.Create(const logger : ILogger; const packageInstallerContext : IPackageInstallerContext; const projectFile : string;
                                     const compilerVersion : TCompilerVersion; const newPackages : IList<IPackageInfo>;
                                     const projectReferences : IList<IPackageReference>; const sharedVersionCache : IDictionary<string, IList<IPackageInfo>>;
-                                    const preferredVersions : IDictionary<string, TPackageVersion>);
+                                    const preferredVersions : IDictionary<string, TPackageVersion>; const pinnedPackages : IList<IPackageInfo>);
 var
   newIds : ISet<string>;
   newPackage : IPackageInfo;
+  pinned : IPackageInfo;
   reference : IPackageReference;
   assignment : TAssignment;
+  dependency : IPackageDependency;
+  requirement : TRequirement;
   id : string;
 begin
   inherited Create;
-  Assert((newPackages <> nil) and newPackages.Any);
+  Assert((newPackages <> nil) and (newPackages.Any or ((pinnedPackages <> nil) and pinnedPackages.Any)));
   FLogger := logger;
   FPackageInstallerContext := packageInstallerContext;
   FProjectFile := projectFile;
@@ -327,6 +338,11 @@ begin
   FTopLevels := TCollections.CreateList<string>;
   FSortedDependencies := TCollections.CreateDictionary<IPackageInfo, IList<IPackageDependency>>;
 
+  FPins := TCollections.CreateDictionary<string, IPackageInfo>;
+  if pinnedPackages <> nil then
+    for pinned in pinnedPackages do
+      FPins[LowerCase(pinned.Id)] := pinned;
+
   newIds := TCollections.CreateSet<string>;
   for newPackage in newPackages do
   begin
@@ -340,7 +356,7 @@ begin
     //The package being installed - or, on restore's slow path, the top level being re-resolved - can also be
     //among the references : restore feeds the previous iteration's flattened graph (top levels AND transients)
     //back in. It replaces the reference - the top level pin is not negotiable.
-    if newIds.Contains(id) or FAssignments.ContainsKey(id) then
+    if newIds.Contains(id) or FPins.ContainsKey(id) or FAssignments.ContainsKey(id) then
       continue;
     assignment := MakeAssignment(reference.PackageInfo, akProjectReference, TLevels.Empty, reference.ParentId, reference.VersionRange);
     assignment.TopLevelReference := reference.IsTopLevel;
@@ -359,6 +375,25 @@ begin
   //once every top level is in, so their ranges constrain the first choice already.
   for newPackage in newPackages do
     Require(newPackage);
+
+  //a pinned package replaces the project's reference to it, and a project reference's dependencies aren't checked
+  //again - so the project's packages that depend on it ask for it now. (New packages asked for theirs above.)
+  for assignment in FAssignments.Values do
+  begin
+    if assignment.Kind <> akProjectReference then
+      continue;
+    for dependency in SortedDependencies(assignment.PackageInfo) do
+    begin
+      if not FPins.ContainsKey(LowerCase(dependency.Id)) then
+        continue;
+      requirement.Owner := assignment.PackageInfo;
+      requirement.Dependency := dependency;
+      if dependency.VersionRange.IsBundledSentinel then
+        FDeferred.Add(requirement)
+      else
+        FAgenda.Add(requirement);
+    end;
+  end;
 end;
 
 procedure TResolverContext.SetAssignment(const packageId : string; const assignment : TAssignment);
@@ -588,6 +623,21 @@ begin
   result := false;
   for assignment in FAssignments.Values do
     if assignment.IsTopLevel and (not assignment.PackageInfo.Version.IsStable) then
+      exit(true);
+end;
+
+function TResolverContext.TryGetPin(const packageId : string; out pinned : IPackageInfo) : boolean;
+begin
+  result := FPins.TryGetValue(LowerCase(packageId), pinned);
+end;
+
+function TResolverContext.AnyPinIsPrerelease : boolean;
+var
+  pinned : IPackageInfo;
+begin
+  result := false;
+  for pinned in FPins.Values do
+    if not pinned.Version.IsStable then
       exit(true);
 end;
 
