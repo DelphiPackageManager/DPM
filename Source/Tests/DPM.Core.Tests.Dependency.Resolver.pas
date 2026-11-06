@@ -142,6 +142,12 @@ type
     procedure Group_Project_Existing_Version_Mismatch_Is_Warning;
 
     [Test]
+    procedure Group_Project_Mismatch_Warning_Names_The_Project_On_The_Lower_Version;
+
+    [Test]
+    procedure Group_Project_Bundled_Resolution_Is_Not_A_Mismatch;
+
+    [Test]
     procedure BuildDependencyGraph_Reflects_Resolved_Tree_Structure;
 
     [Test]
@@ -1340,6 +1346,67 @@ begin
   Assert.IsTrue(logger.Logged('warning', 'X-1.0.5 in project [' + cTestProject + '] does not satisfy 1.0.0'),
     'the warning should name this project''s version first, then the range it does not satisfy');
   Assert.IsTrue(logger.Logged('warning', 'C:\test\sibling.dproj'), 'the warning should name the sibling project');
+  Assert.IsTrue(logger.Logged('warning', 'Upgrade X to 1.0.5 in [C:\test\sibling.dproj] to bring it into line.'),
+    'the warning says which project to upgrade, to what : ' + logger.Messages.Text);
+end;
+
+procedure TDependencyResolverTests.Group_Project_Mismatch_Warning_Names_The_Project_On_The_Lower_Version;
+var
+  x, b : IPackageInfo;
+  siblingX : IResolvedPackage;
+  xLocal : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  logger : TTestLogger;
+  ok : boolean;
+begin
+  // As above, but this project is the one behind - it is the one to upgrade.
+  x := MakeInfo('X', '1.0.5', []);
+  b := MakeInfo('B', '1.0.0', []);
+  siblingX := TResolvedPackage.Create(x, MakeRange('1.0.5'), 'root-node', 'C:\test\sibling.dproj');
+  FContext.SeedResolutions('C:\test\sibling.dproj', [siblingX]);
+
+  xLocal := MakeTopLevelRef(MakeInfo('X', '1.0.0', []), MakeRange('1.0.0'));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(xLocal);
+
+  logger := FLogger as TTestLogger;
+  logger.Clear;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, b, projectRefs, graph, resolved);
+  Assert.IsTrue(ok, logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'X-1.0.0 in project [' + cTestProject + '] does not satisfy 1.0.5'), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'Upgrade X to 1.0.5 in [' + cTestProject + '] to bring it into line.'),
+    'the warning says which project to upgrade, to what : ' + logger.Messages.Text);
+end;
+
+procedure TDependencyResolverTests.Group_Project_Bundled_Resolution_Is_Not_A_Mismatch;
+var
+  b : IPackageInfo;
+  siblingIndy : IResolvedPackage;
+  indyLocal : IPackageReference;
+  projectRefs : IList<IPackageReference>;
+  resolved : IList<IPackageInfo>;
+  graph : IPackageReference;
+  logger : TTestLogger;
+  ok : boolean;
+begin
+  // The sibling uses the IDE's own Indy (a bundled no-op) and this project a real one - the bundled one has no
+  // version to share, so there is nothing to bring into line.
+  b := MakeInfo('B', '1.0.0', []);
+  siblingIndy := TResolvedPackage.Create(TPackageInfo.CreateBundled('Indy', cTestCompiler), TVersionRange.Parse(cBundledDependencyVersion),
+                                         'root-node', 'C:\test\sibling.dproj', true);
+  FContext.SeedResolutions('C:\test\sibling.dproj', [siblingIndy]);
+
+  indyLocal := MakeTopLevelRef(MakeInfo('Indy', '10.6.2', []), MakeRange('10.6.2'));
+  projectRefs := TCollections.CreateList<IPackageReference>;
+  projectRefs.Add(indyLocal);
+
+  logger := FLogger as TTestLogger;
+  logger.Clear;
+  ok := FResolver.ResolveForInstall(FCancellation, cTestCompiler, cTestProject, FOptions, b, projectRefs, graph, resolved);
+  Assert.IsTrue(ok, logger.Messages.Text);
+  Assert.IsFalse(logger.HasWarning(TWarningCode.W2010_ProjectGroupMismatch), logger.Messages.Text);
 end;
 
 procedure TDependencyResolverTests.BuildDependencyGraph_Reflects_Resolved_Tree_Structure;

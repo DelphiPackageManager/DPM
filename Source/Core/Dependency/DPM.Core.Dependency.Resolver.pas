@@ -973,6 +973,8 @@ var
   parent : TAssignment;
   parentText : string;
   stopwatch : TStopwatch;
+  lowerProject : string;
+  higherVersion : TPackageVersion;
 begin
   Assert(FConfiguration <> nil, 'config is nil, Initialize has not been called');
 
@@ -983,9 +985,25 @@ begin
   for packageRef in projectReferences do
   begin
     resolution := FPackageInstallerContext.FindPackageResolution(projectFile, packageRef.Id);
-    if (resolution <> nil) and (not resolution.VersionRange.IsSatisfiedBy(packageRef.Version)) then
-      FLogger.Warning(TWarningCode.W2010_ProjectGroupMismatch, 'Package project group mismatch : ' + packageRef.Id + '-' + packageRef.Version.ToStringNoMeta + ' in project [' + projectFile +
-                      '] does not satisfy ' + resolution.VersionRange.ToString + ' used in project [' + resolution.ProjectFile + ']');
+    if (resolution = nil) or resolution.VersionRange.IsSatisfiedBy(packageRef.Version) then
+      continue;
+    //the IDE's own (bundled) have no version to share - as restore's DPMW2010.
+    if resolution.IsBundled or IsBundledPackageInfo(packageRef.PackageInfo) then
+      continue;
+    //the project behind is the one to upgrade (as restore's DPMW2010 says).
+    if packageRef.Version < resolution.PackageInfo.Version then
+    begin
+      lowerProject := projectFile;
+      higherVersion := resolution.PackageInfo.Version;
+    end
+    else
+    begin
+      lowerProject := resolution.ProjectFile;
+      higherVersion := packageRef.Version;
+    end;
+    FLogger.Warning(TWarningCode.W2010_ProjectGroupMismatch, 'Package project group mismatch : ' + packageRef.Id + '-' + packageRef.Version.ToStringNoMeta + ' in project [' + projectFile +
+                    '] does not satisfy ' + resolution.VersionRange.ToString + ' used in project [' + resolution.ProjectFile + ']. Upgrade ' + packageRef.Id +
+                    ' to ' + higherVersion.ToStringNoMeta + ' in [' + lowerProject + '] to bring it into line.');
   end;
 
   stopwatch := TStopwatch.StartNew;
