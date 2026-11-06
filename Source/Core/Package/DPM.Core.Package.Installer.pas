@@ -260,6 +260,10 @@ type
     //be checked against - what the resolver records when it resolves one.
     procedure RecordGraphResolutions(const projectFile : string; const graph : IPackageReference; const resolvedPackages : IList<IPackageInfo>);
 
+    //Warns (W2010) for each package in a graph the project already records that another project in the group uses at a
+    //different version - what the resolver would have found, had the graph needed resolving.
+    procedure ReportGroupMismatches(const projectFile : string; const graph : IPackageReference; const resolvedPackages : IList<IPackageInfo>);
+
     // Records the graph and downloads the resolved packages (bundled no-ops left out) - the platform
     // independent part of an install or restore.
     function PrepareProjectPackages(const cancellationToken: ICancellationToken; const projectFile: string; const projectPackageGraph: IPackageReference;
@@ -2019,6 +2023,51 @@ begin
   result := RestoreUsingInstallResolver(cancellationToken, options, projectFile, topLevelGraph, preferredVersions, projectGraph, resolvedPackages);
   if result then
     ApplyGraphLocks(projectGraph, locks);
+end;
+
+procedure TPackageInstaller.ReportGroupMismatches(const projectFile : string; const graph : IPackageReference; const resolvedPackages : IList<IPackageInfo>);
+var
+  infos : IDictionary<string, IPackageInfo>;
+  info : IPackageInfo;
+  seen : ISet<string>;
+begin
+  infos := TCollections.CreateDictionary<string, IPackageInfo>;
+  for info in resolvedPackages do
+    infos[LowerCase(info.Id)] := info;
+  seen := TCollections.CreateSet<string>;
+  graph.VisitDFS(
+    procedure(const node : IPackageReference)
+    var
+      nodeInfo : IPackageInfo;
+      sibling : IResolvedPackage;
+      lowerProject : string;
+      higherVersion : TPackageVersion;
+    begin
+      if seen.Contains(LowerCase(node.Id)) then
+        exit;
+      seen.Add(LowerCase(node.Id));
+      //the same packages RecordGraphResolutions records - the IDE's own (bundled) have no version to share.
+      if (not infos.TryGetValue(LowerCase(node.Id), nodeInfo)) or IsBundledPackageInfo(nodeInfo) then
+        exit;
+      sibling := FContext.FindPackageResolution(projectFile, node.Id);
+      if (sibling = nil) or sibling.IsBundled or (sibling.PackageInfo.Version = nodeInfo.Version) then
+        exit;
+      //the project behind is the one to upgrade.
+      if nodeInfo.Version < sibling.PackageInfo.Version then
+      begin
+        lowerProject := projectFile;
+        higherVersion := sibling.PackageInfo.Version;
+      end
+      else
+      begin
+        lowerProject := sibling.ProjectFile;
+        higherVersion := nodeInfo.Version;
+      end;
+      FLogger.Warning(TWarningCode.W2010_ProjectGroupMismatch, 'Package project group mismatch : ' + node.Id + '-' + nodeInfo.Version.ToStringNoMeta +
+                      ' in project [' + projectFile + '] differs from ' + sibling.PackageInfo.Id + '-' + sibling.PackageInfo.Version.ToStringNoMeta +
+                      ' used in project [' + sibling.ProjectFile + '] - the projects in a group should use the same version. Upgrade ' +
+                      node.Id + ' to ' + higherVersion.ToStringNoMeta + ' in [' + lowerProject + '] to bring it into line.');
+    end);
 end;
 
 procedure TPackageInstaller.RecordGraphResolutions(const projectFile : string; const graph : IPackageReference; const resolvedPackages : IList<IPackageInfo>);
@@ -3896,6 +3945,9 @@ begin
   //projects now. A re-resolved one only counts once the project is saved with it.
   if not reResolved then
   begin
+    //The projects in a group share one version of a package. Nothing resolved this graph, so nothing has compared it
+    //with the other projects' - a package depending on one used at two versions is rebuilt for each project in turn.
+    ReportGroupMismatches(projectFile, finalGraph, resolvedPackages);
     RecordGraphResolutions(projectFile, finalGraph, resolvedPackages);
     FContext.CommitProject(projectFile);
   end;

@@ -156,6 +156,15 @@ type
     [Test]
     procedure Uninstall_Drops_What_The_Project_Recorded;
 
+    //The projects in a group share one version of a package. A restore that finds the project's graph intact doesn't
+    //resolve - it still says when another project in the group uses a different version of one of its packages.
+    [Test]
+    procedure Restore_Warns_When_Another_Project_Uses_A_Different_Version;
+    [Test]
+    procedure Restore_Warning_Names_The_Project_On_The_Lower_Version;
+    [Test]
+    procedure Restore_Does_Not_Warn_When_Another_Project_Uses_The_Same_Version;
+
     //With no compiler given, each project in a group is restored (or uninstalled from) for its own compiler -
     //not the one the first project was for.
     [Test]
@@ -2577,6 +2586,65 @@ begin
   Assert.IsNotNull(resolution, 'another project in the group must be checked against what this one uses');
   Assert.AreEqual('1.0.0', resolution.PackageInfo.Version.ToStringNoMeta);
   Assert.IsNotNull(context.FindPackageResolution(cOtherProject, 'VSoft.Foo'));
+end;
+
+//Restores the locked consumer project (VSoft.Foo 1.0.0 -> VSoft.Bar 1.0.0, intact) for Win32, in a group where
+//cOtherProject already uses VSoft.Bar at otherBarVersion. True when it restored - logger has what it said.
+function RestoreBesideOtherProjectUsingBar(const tempFolder : string; const logger : ILogger; const otherBarVersion : string) : boolean;
+var
+  projectFile : string;
+  context : IPackageInstallerContext;
+  installer : IPackageInstaller;
+begin
+  installer := NewLockedFixture(tempFolder, logger, LockedConsumerProject(cBarHash), [MakeDep('VSoft.Bar', '1.0.0')], cPackageSpec, [],
+                                projectFile, context);
+  (context as TFakeInstallerContext).SeedResolutions(cOtherProject,
+    [TResolvedPackage.Create(MakeInfo('VSoft.Bar', otherBarVersion, []), MakeRange(otherBarVersion), cRootNode, cOtherProject)]);
+  result := RestoreForWin32(installer, context, projectFile);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Warns_When_Another_Project_Uses_A_Different_Version;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(RestoreBesideOtherProjectUsingBar(FTempFolder, loggerIntf, '2.0.0'), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('verbose', 'skipping resolution'), 'precondition : the graph was found intact : ' + logger.Messages.Text);
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.AreEqual(1, logger.WarningCount, logger.Messages.Text);
+  Assert.IsTrue(logger.HasWarning(TWarningCode.W2010_ProjectGroupMismatch), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'VSoft.Bar-1.0.0'), 'the warning names this project''s version : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'VSoft.Bar-2.0.0'), 'the warning names the other project''s version : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', cOtherProject), 'the warning names the other project : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'Upgrade VSoft.Bar to 2.0.0 in [' + TPath.Combine(TPath.Combine(FTempFolder, 'locks'), 'Consumer.dproj') + ']'),
+                'the warning says which project to upgrade, to what : ' + logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Warning_Names_The_Project_On_The_Lower_Version;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+begin
+  //the other project is behind - it is the one to upgrade.
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(RestoreBesideOtherProjectUsingBar(FTempFolder, loggerIntf, '0.9.0'), logger.Messages.Text);
+  Assert.IsTrue(logger.HasWarning(TWarningCode.W2010_ProjectGroupMismatch), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('warning', 'Upgrade VSoft.Bar to 1.0.0 in [' + cOtherProject + ']'), logger.Messages.Text);
+end;
+
+procedure TInstallerDiagnosticsTests.Restore_Does_Not_Warn_When_Another_Project_Uses_The_Same_Version;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+begin
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  Assert.IsTrue(RestoreBesideOtherProjectUsingBar(FTempFolder, loggerIntf, '1.0.0'), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('verbose', 'skipping resolution'), 'precondition : the graph was found intact : ' + logger.Messages.Text);
+  Assert.IsFalse(logger.HasWarning(TWarningCode.W2010_ProjectGroupMismatch), logger.Messages.Text);
 end;
 
 procedure TInstallerDiagnosticsTests.Restore_That_Keeps_Nothing_Records_Nothing;
