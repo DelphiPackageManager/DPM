@@ -38,8 +38,6 @@ uses
 {$SCOPEDENUMS ON}
 
 type
-  TCompilerVerbosity = (Quiet, Minimal, Normal, Detailed, Diagnostic);
-
   ICompiler = interface
     ['{4A56BA53-6ACD-4A5D-8D55-B921D6CDC8A0}']
     function GetCompilerVersion : TCompilerVersion;

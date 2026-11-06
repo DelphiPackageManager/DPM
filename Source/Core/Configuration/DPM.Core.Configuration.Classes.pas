@@ -129,6 +129,22 @@ type
     constructor Create;
   end;
 
+  TCompilerOutputConfig = class(TInterfacedObject, ICompilerOutputConfig)
+  private
+    FLogger : ILogger;
+    FLogLevel : TCompilerOutputLogLevel;
+    FMSBuildVerbosity : TCompilerVerbosity;
+  protected
+    function GetLogLevel : TCompilerOutputLogLevel;
+    procedure SetLogLevel(const value : TCompilerOutputLogLevel);
+    function GetMSBuildVerbosity : TCompilerVerbosity;
+    procedure SetMSBuildVerbosity(const value : TCompilerVerbosity);
+    function LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+    function SaveToYAML(const parentObj : IYAMLValue) : boolean;
+  public
+    constructor Create(const logger : ILogger);
+  end;
+
   TConfiguration = class(TInterfacedObject, IConfiguration, IConfigurationLoadSave)
   private
     FSources : IList<ISourceConfig>;
@@ -137,6 +153,7 @@ type
     FAuthor : string;
     FRegistryRefreshIntervalMinutes : integer;
     FSigning : ISigningConfig;
+    FCompilerOutput : ICompilerOutputConfig;
     FLogger : ILogger;
   protected
     function GetFileName : string;
@@ -152,6 +169,7 @@ type
     function GetRegistryRefreshIntervalMinutes : integer;
     procedure SetRegistryRefreshIntervalMinutes(const value : integer);
     function GetSigning : ISigningConfig;
+    function GetCompilerOutput : ICompilerOutputConfig;
 
     function LoadFromFile(const fileName : string) : boolean;
     function SaveToFile(const fileName : string) : boolean;
@@ -553,6 +571,113 @@ begin
   result := true;
 end;
 
+{ TCompilerOutputConfig }
+
+function TryParseCompilerOutputLogLevel(const value : string; out logLevel : TCompilerOutputLogLevel) : boolean;
+var
+  candidate : TCompilerOutputLogLevel;
+begin
+  result := false;
+  logLevel := cDefaultCompilerOutputLogLevel;
+  for candidate := Low(TCompilerOutputLogLevel) to High(TCompilerOutputLogLevel) do
+  begin
+    if SameText(value, cCompilerOutputLogLevelNames[candidate]) then
+    begin
+      logLevel := candidate;
+      exit(true);
+    end;
+  end;
+end;
+
+function TryParseCompilerVerbosity(const value : string; out verbosity : TCompilerVerbosity) : boolean;
+var
+  candidate : TCompilerVerbosity;
+begin
+  result := false;
+  verbosity := cDefaultCompilerVerbosity;
+  for candidate := Low(TCompilerVerbosity) to High(TCompilerVerbosity) do
+  begin
+    if SameText(value, cCompilerVerbosityNames[candidate]) then
+    begin
+      verbosity := candidate;
+      exit(true);
+    end;
+  end;
+end;
+
+constructor TCompilerOutputConfig.Create(const logger : ILogger);
+begin
+  inherited Create;
+  FLogger := logger;
+  FLogLevel := cDefaultCompilerOutputLogLevel;
+  FMSBuildVerbosity := cDefaultCompilerVerbosity;
+end;
+
+function TCompilerOutputConfig.GetLogLevel : TCompilerOutputLogLevel;
+begin
+  result := FLogLevel;
+end;
+
+procedure TCompilerOutputConfig.SetLogLevel(const value : TCompilerOutputLogLevel);
+begin
+  FLogLevel := value;
+end;
+
+function TCompilerOutputConfig.GetMSBuildVerbosity : TCompilerVerbosity;
+begin
+  result := FMSBuildVerbosity;
+end;
+
+procedure TCompilerOutputConfig.SetMSBuildVerbosity(const value : TCompilerVerbosity);
+begin
+  FMSBuildVerbosity := value;
+end;
+
+function TCompilerOutputConfig.LoadFromYAML(const yamlObj : IYAMLValue) : boolean;
+var
+  obj : IYAMLMapping;
+  value : string;
+  logLevel : TCompilerOutputLogLevel;
+  verbosity : TCompilerVerbosity;
+begin
+  if not yamlObj.IsMapping then
+    exit(false);
+  obj := yamlObj.AsMapping;
+  //an unknown value is a warning, and that key keeps its default - DPM still works.
+  if obj.Contains('logLevel') then
+  begin
+    value := obj.S['logLevel'];
+    if TryParseCompilerOutputLogLevel(value, logLevel) then
+      FLogLevel := logLevel
+    else
+      FLogger.Warning(TWarningCode.W0204_ConfigurationValueInvalid, 'The configuration value compilerOutput.logLevel [' + value +
+                      '] is not valid - it can be verbose or information. Using ' + cCompilerOutputLogLevelNames[FLogLevel] + '.');
+  end;
+  if obj.Contains('msbuildVerbosity') then
+  begin
+    value := obj.S['msbuildVerbosity'];
+    if TryParseCompilerVerbosity(value, verbosity) then
+      FMSBuildVerbosity := verbosity
+    else
+      FLogger.Warning(TWarningCode.W0204_ConfigurationValueInvalid, 'The configuration value compilerOutput.msbuildVerbosity [' + value +
+                      '] is not valid - it can be quiet, minimal, normal, detailed or diagnostic. Using ' + cCompilerVerbosityNames[FMSBuildVerbosity] + '.');
+  end;
+  result := true;
+end;
+
+function TCompilerOutputConfig.SaveToYAML(const parentObj : IYAMLValue) : boolean;
+var
+  obj : IYAMLMapping;
+begin
+  result := true;
+  //only when it isn't the default, so saving a configuration (the IDE options page does) leaves existing files alone.
+  if (FLogLevel = cDefaultCompilerOutputLogLevel) and (FMSBuildVerbosity = cDefaultCompilerVerbosity) then
+    exit;
+  obj := parentObj.AsMapping.AddOrSetMapping('compilerOutput');
+  obj.S['logLevel'] := cCompilerOutputLogLevelNames[FLogLevel];
+  obj.S['msbuildVerbosity'] := cCompilerVerbosityNames[FMSBuildVerbosity];
+end;
+
 { TConfiguration }
 
 procedure TConfiguration.AddDefaultSources;
@@ -569,7 +694,13 @@ begin
   FLogger := logger;
   FSources := TCollections.CreateList<ISourceConfig>;
   FSigning := TSigningConfig.Create;
+  FCompilerOutput := TCompilerOutputConfig.Create(logger);
   FRegistryRefreshIntervalMinutes := cDefaultRegistryRefreshMinutes;
+end;
+
+function TConfiguration.GetCompilerOutput : ICompilerOutputConfig;
+begin
+  result := FCompilerOutput;
 end;
 
 function TConfiguration.GetSigning : ISigningConfig;
@@ -684,6 +815,8 @@ begin
     FRegistryRefreshIntervalMinutes := root.I['registryRefreshIntervalMinutes'];
   if root.Contains('signing') then
     FSigning.LoadFromYAML(root.Values['signing']);
+  if root.Contains('compilerOutput') then
+    FCompilerOutput.LoadFromYAML(root.Values['compilerOutput']);
   sources := root.A['packageSources'];
   bResult := true;
   for i := 0 to sources.Count - 1 do
@@ -763,6 +896,7 @@ begin
     root.S['author'] := FAuthor;
   root.I['registryRefreshIntervalMinutes'] := FRegistryRefreshIntervalMinutes;
   FSigning.SaveToYAML(parentObj);
+  FCompilerOutput.SaveToYAML(parentObj);
   sources := root.A['packageSources'];
   for i := 0 to FSources.Count - 1 do
     result := FSources[i].SaveToYAML(sources) and result;

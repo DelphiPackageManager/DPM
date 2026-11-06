@@ -172,6 +172,7 @@ type
   TWarningCode = (
     W0004_OperationCancelled,
     W0108_OptionHasNoEffect,
+    W0204_ConfigurationValueInvalid,
     W0302_UpgradeCheckUnavailable,
     W0305_UpgradeCacheWriteFailed,
     W1004_SourceUnavailable,
@@ -375,6 +376,7 @@ const
   cWarningInfo : array[TWarningCode] of TDiagnosticInfo = (
     (Number : 4; Title : 'The operation was cancelled'),
     (Number : 108; Title : 'A command line option has no effect'),
+    (Number : 204; Title : 'A configuration value is not valid'),
     (Number : 302; Title : 'The check for a newer version of DPM could not be made'),
     (Number : 305; Title : 'Unable to write the update check cache'),
     (Number : 1004; Title : 'A package source could not be used'),

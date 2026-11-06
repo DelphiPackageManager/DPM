@@ -90,6 +90,20 @@ type
     property TrustedRepositories : IList<ITrustedRepositoryConfig> read GetTrustedRepositories;
   end;
 
+  //How package compiles show their output - the compilerOutput section.
+  ICompilerOutputConfig = interface(IConfigNode)
+    ['{532AED61-953D-4840-9EFD-4E9E873FA376}']
+    function GetLogLevel : TCompilerOutputLogLevel;
+    procedure SetLogLevel(const value : TCompilerOutputLogLevel);
+    function GetMSBuildVerbosity : TCompilerVerbosity;
+    procedure SetMSBuildVerbosity(const value : TCompilerVerbosity);
+
+    //the level each line msbuild writes is logged at, as it arrives. Default verbose.
+    property LogLevel : TCompilerOutputLogLevel read GetLogLevel write SetLogLevel;
+    //msbuild's /v: verbosity. Default normal.
+    property MSBuildVerbosity : TCompilerVerbosity read GetMSBuildVerbosity write SetMSBuildVerbosity;
+  end;
+
   ISourceConfig = interface(IConfigNode)
     ['{88D98629-8276-4782-B46B-004E7B9934E4}']
     function GetName : string;
@@ -137,6 +151,7 @@ type
     procedure SetRegistryRefreshIntervalMinutes(const value : integer);
 
     function GetSigning : ISigningConfig;
+    function GetCompilerOutput : ICompilerOutputConfig;
 
     property FileName : string read GetFileName write SetFileName;
     //defaults to %userprofile%\.dpm\packages - can override with env var DPM_PACKAGES
@@ -155,6 +170,9 @@ type
     // Signing policy block (Phase 1+). Always non-nil; freshly created
     // configs have default values per the architecture doc.
     property Signing : ISigningConfig read GetSigning;
+
+    //How package compiles show their output. Always non-nil.
+    property CompilerOutput : ICompilerOutputConfig read GetCompilerOutput;
 
   end;
 

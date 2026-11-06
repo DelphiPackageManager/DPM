@@ -41,6 +41,13 @@ type
   //Note : This type is serialized in options, changing names or order may break things!
   TVerbosity = (Quiet, Normal, Detailed, Debug);
 
+  //How much msbuild writes when it compiles a package - its /v: switch, and the configuration's
+  //compilerOutput.msbuildVerbosity.
+  TCompilerVerbosity = (Quiet, Minimal, Normal, Detailed, Diagnostic);
+
+  //The level each line of compiler output is logged at as it arrives - the configuration's compilerOutput.logLevel.
+  TCompilerOutputLogLevel = (Verbose, Information);
+
   //Output format for commands that can emit machine readable results.
   //Json output is compact, goes to stdout on its own, and suppresses the banner.
   TOutputFormat = (Text, Json);
@@ -76,6 +83,12 @@ type
 
 const
   DelphiMax =  High(TCompilerVersion);
+
+  //the names dpm.config.yaml uses - for the verbosity, also msbuild's /v: values.
+  cCompilerVerbosityNames : array[TCompilerVerbosity] of string = ('quiet', 'minimal', 'normal', 'detailed', 'diagnostic');
+  cCompilerOutputLogLevelNames : array[TCompilerOutputLogLevel] of string = ('verbose', 'information');
+  cDefaultCompilerVerbosity = TCompilerVerbosity.Normal;
+  cDefaultCompilerOutputLogLevel = TCompilerOutputLogLevel.Verbose;
 
 
 type
