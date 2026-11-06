@@ -95,6 +95,20 @@ type
 
     [Test]
     procedure Companion_Needing_Minor_Bump_Lists_Versions_Once;
+    [Test]
+    procedure Upgrade_Changes_A_Dependency_In_Place;
+
+    [Test]
+    procedure Upgrade_Leaves_A_Project_Whose_Parent_Rejects_The_Version;
+
+    [Test]
+    procedure Upgrade_Skips_A_Dependency_Already_At_The_Version;
+
+    [Test]
+    procedure Upgrade_Of_A_Dependency_Already_At_The_Version_Everywhere_Is_Not_E3002;
+
+    [Test]
+    procedure Upgrade_Of_A_Parent_And_Its_Dependency_Changes_Both;
   end;
 
 implementation
@@ -612,6 +626,112 @@ begin
   Assert.AreEqual('1.1.0', FindItem(plan, 'Ext').PackageInfo.Version.ToStringNoMeta);
   Assert.AreEqual(1, FRepo.GetVersionsCallCount('Ext'), 'versions listed once');
   Assert.AreEqual(2, FRepo.GetCallCount('Ext'), 'the installed 1.0 line, then the 1.1 line');
+end;
+
+procedure TInstallPlannerTests.Upgrade_Changes_A_Dependency_In_Place;
+var
+  root : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  // Base is only Core's dependency, and Core accepts any 1.0.x - Base moves under Core. Not E3002, not a top level.
+  root := AddProject(cApp);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded, 'a package that is only a dependency can be upgraded');
+  Assert.AreEqual(1, plan.Projects.Count);
+  Assert.AreEqual(0, plan.PackagesForProject(cApp).Count, 'Base is not made a top level');
+  Assert.AreEqual(1, plan.PinsForProject(cApp).Count);
+  Assert.AreEqual('1.0.3', plan.PinsForProject(cApp)[0].Version.ToStringNoMeta);
+  lines := plan.SummaryLines;
+  Assert.AreEqual(4, lines.Count);
+  Assert.AreEqual('Base 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('    app.dproj (transitive)', lines[1], false);
+  Assert.AreEqual('', lines[2]);
+  Assert.AreEqual('Projects : app.dproj', lines[3], false);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Leaves_A_Project_Whose_Parent_Rejects_The_Version;
+var
+  root : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+  lines : IList<string>;
+begin
+  root := AddProject(cApp);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+  root := AddProject(cTests);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual(1, plan.Projects.Count);
+  Assert.AreEqual(cTests, plan.Projects[0], false);
+  Assert.AreEqual(0, plan.PinsForProject(cApp).Count);
+  lines := plan.SummaryLines;
+  Assert.AreEqual('Base 1.0.1 -> 1.0.3', lines[0], false);
+  Assert.AreEqual('    tests.dproj (transitive)', lines[1], false);
+  Assert.AreEqual('    left unchanged in app.dproj - Core 1.0.1 requires Base 1.0.1', lines[2], false);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Skips_A_Dependency_Already_At_The_Version;
+var
+  root : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+begin
+  root := AddProject(cApp);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.1'), MakeRange('[1.0.1,]'));
+  root := AddProject(cTests);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.3'), MakeRange('[1.0.1,]'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual(1, plan.Projects.Count);
+  Assert.AreEqual(cApp, plan.Projects[0], false);
+  Assert.AreEqual(0, plan.PinsForProject(cTests).Count);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Of_A_Dependency_Already_At_The_Version_Everywhere_Is_Not_E3002;
+var
+  root : IPackageReference;
+  core : IPackageReference;
+  plan : IInstallPlan;
+begin
+  root := AddProject(cApp);
+  core := AddPackage(root, 'Core', '1.0.1', '', []);
+  core.AddChild('Base', MakeVersion('1.0.3'), MakeRange('[1.0.1,]'));
+
+  plan := MakePlan([MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded, 'nothing to change is not an error here');
+  Assert.AreEqual(0, plan.Projects.Count);
+end;
+
+procedure TInstallPlannerTests.Upgrade_Of_A_Parent_And_Its_Dependency_Changes_Both;
+var
+  root : IPackageReference;
+  plan : IInstallPlan;
+begin
+  // Core's old exact range on Base doesn't block it : Core is a top level here and moves too, so its new
+  // range is what counts.
+  root := AddProject(cApp);
+  AddPackage(root, 'Core', '1.0.1', '', ['Base', '1.0.1']);
+
+  plan := MakePlan([MakeInfo('Core', '1.0.3', [MakeDep('Base', '1.0.3')]), MakeInfo('Base', '1.0.3', [])]);
+
+  Assert.IsTrue(plan.Succeeded);
+  Assert.AreEqual(1, plan.PackagesForProject(cApp).Count, 'Core');
+  Assert.AreEqual(1, plan.PinsForProject(cApp).Count, 'Base');
 end;
 
 initialization

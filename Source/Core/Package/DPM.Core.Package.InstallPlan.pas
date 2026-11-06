@@ -67,16 +67,20 @@ type
     FPackageInfo : IPackageInfo;
     FIsCompanion : boolean;
     FCurrentVersion : TPackageVersion;
-    //every version referenced at the top level of the plan's projects, lowest first, no duplicates.
+    //every version referenced in the plan's projects, as a top level or a dependency, lowest first, no duplicates.
     FCurrentVersions : IList<TPackageVersion>;
     FReason : string;
     FProjects : IList<string>;
+    FTransitiveProjects : IList<string>;
+    FBlockedProjects : IList<TPlanBlockedProject>;
   protected
     function GetPackageInfo : IPackageInfo;
     function GetIsCompanion : boolean;
     function GetCurrentVersion : TPackageVersion;
     function GetReason : string;
     function GetProjects : IList<string>;
+    function GetTransitiveProjects : IList<string>;
+    function GetBlockedProjects : IList<TPlanBlockedProject>;
     function VersionChangeText : string;
   public
     constructor Create(const packageInfo : IPackageInfo; const isCompanion : boolean; const reason : string);
@@ -96,6 +100,7 @@ type
     function GetProjects : IList<string>;
     function HasCompanions : boolean;
     function PackagesForProject(const projectFile : string) : IList<IPackageInfo>;
+    function PinsForProject(const projectFile : string) : IList<IPackageInfo>;
     function SummaryLines : IList<string>;
   public
     constructor Create;
@@ -155,6 +160,7 @@ type
     function TrialResolve(const candidate : IPackageInfo) : boolean;
     function PickCompanion(const blocker : TBlocker; const candidates : IList<IPackageInfo>) : IPackageInfo;
     function FindCompanion(const blocker : TBlocker) : IPackageInfo;
+    function AddTransitiveProject(const item : TInstallPlanItem; const project : TInstallPlanProject) : boolean;
     procedure PopulatePlan;
   public
     constructor Create(const cancellationToken : ICancellationToken; const logger : ILogger; const config : IConfiguration; const options : TSearchOptions;
@@ -192,6 +198,8 @@ begin
   FCurrentVersion := TPackageVersion.Empty;
   FCurrentVersions := TCollections.CreateList<TPackageVersion>;
   FProjects := TCollections.CreateList<string>;
+  FTransitiveProjects := TCollections.CreateList<string>;
+  FBlockedProjects := TCollections.CreateList<TPlanBlockedProject>;
 end;
 
 procedure TInstallPlanItem.AddCurrentVersion(const version : TPackageVersion);
@@ -254,6 +262,16 @@ begin
   result := FProjects;
 end;
 
+function TInstallPlanItem.GetTransitiveProjects : IList<string>;
+begin
+  result := FTransitiveProjects;
+end;
+
+function TInstallPlanItem.GetBlockedProjects : IList<TPlanBlockedProject>;
+begin
+  result := FBlockedProjects;
+end;
+
 function TInstallPlanItem.GetReason : string;
 begin
   result := FReason;
@@ -300,6 +318,11 @@ begin
     for item in FItems do
     begin
       for projectFile in item.Projects do
+      begin
+        if SameText(projectFile, project.ProjectFile) and (not FProjects.Contains(project.ProjectFile)) then
+          FProjects.Add(project.ProjectFile);
+      end;
+      for projectFile in item.TransitiveProjects do
       begin
         if SameText(projectFile, project.ProjectFile) and (not FProjects.Contains(project.ProjectFile)) then
           FProjects.Add(project.ProjectFile);
@@ -359,6 +382,25 @@ begin
   end;
 end;
 
+function TInstallPlan.PinsForProject(const projectFile : string) : IList<IPackageInfo>;
+var
+  item : IInstallPlanItem;
+  itemProject : string;
+begin
+  result := TCollections.CreateList<IPackageInfo>;
+  for item in FItems do
+  begin
+    for itemProject in item.TransitiveProjects do
+    begin
+      if SameText(itemProject, projectFile) then
+      begin
+        result.Add(item.PackageInfo);
+        break;
+      end;
+    end;
+  end;
+end;
+
 //Short lines - this is shown in the IDE's confirmation message box as well as the log.
 function TInstallPlan.SummaryLines : IList<string>;
 var
@@ -366,6 +408,7 @@ var
   line : string;
   projectFile : string;
   separatorPos : integer;
+  blocked : TPlanBlockedProject;
 begin
   result := TCollections.CreateList<string>;
   for item in FItems do
@@ -391,6 +434,10 @@ begin
       else
         result.Add('    ' + item.Reason);
     end;
+    for projectFile in item.TransitiveProjects do
+      result.Add('    ' + ExtractFileName(projectFile) + ' (transitive)');
+    for blocked in item.BlockedProjects do
+      result.Add('    left unchanged in ' + ExtractFileName(blocked.ProjectFile) + ' - ' + blocked.Reason);
   end;
   if FProjects.Any then
   begin
@@ -766,6 +813,50 @@ begin
   end;
 end;
 
+//A project where the package is only a dependency : it changes in place, under its parents, when each of them
+//accepts the version - otherwise the project is left as it is, and the plan says why. A parent that is a top level
+//here and moves with the plan isn't asked - its new version's range is what counts, and the resolve checks that.
+//True when the project has the package at all (changing or not).
+function TUpgradePlanBuilder.AddTransitiveProject(const item : TInstallPlanItem; const project : TInstallPlanProject) : boolean;
+var
+  nodes : IList<IPackageReference>;
+  node : IPackageReference;
+  parent : IPackageReference;
+  version : TPackageVersion;
+  changes : boolean;
+  parentMoves : boolean;
+  blocked : TPlanBlockedProject;
+begin
+  nodes := project.Graph.FindChildren(item.FPackageInfo.Id);
+  result := nodes.Any;
+  if not result then
+    exit;
+  version := item.FPackageInfo.Version;
+  changes := false;
+  for node in nodes do
+  begin
+    parent := node.Parent;
+    if (parent = nil) or parent.IsRoot then
+      continue;
+    parentMoves := FPlanVersions.ContainsKey(LowerCase(parent.Id)) and (project.Graph.FindTopLevelChild(parent.Id) <> nil);
+    if (not parentMoves) and (not node.VersionRange.IsEmpty) and (not node.VersionRange.IsBundledSentinel) and
+       (not node.VersionRange.IsSatisfiedBy(version)) then
+    begin
+      blocked.ProjectFile := project.ProjectFile;
+      blocked.Reason := parent.Id + ' ' + parent.Version.ToStringNoMeta + ' requires ' + node.Id + ' ' + node.VersionRange.ToString;
+      item.FBlockedProjects.Add(blocked);
+      exit;
+    end;
+    if node.Version <> version then
+      changes := true;
+  end;
+  if not changes then
+    exit;
+  item.FTransitiveProjects.Add(project.ProjectFile);
+  for node in nodes do
+    item.AddCurrentVersion(node.Version);
+end;
+
 procedure TUpgradePlanBuilder.PopulatePlan;
 var
   info : IPackageInfo;
@@ -773,6 +864,7 @@ var
   item : TInstallPlanItem;
   project : TInstallPlanProject;
   node : IPackageReference;
+  found : boolean;
 begin
   for info in FPlanPackages do
   begin
@@ -780,18 +872,25 @@ begin
       reason := '';
     item := TInstallPlanItem.Create(info, reason <> '', reason);
     FPlan.AddItem(item);
-    //an upgrade only touches projects where the package is a top level reference.
+    //an upgrade applies to projects where the package is a top level reference, and changes it in place where it
+    //is only a dependency (when its parents accept the version).
+    found := false;
     for project in FProjects do
     begin
       if project.Graph = nil then
         continue;
       node := project.Graph.FindTopLevelChild(info.Id);
       if node = nil then
+      begin
+        if AddTransitiveProject(item, project) then
+          found := true;
         continue;
+      end;
+      found := true;
       item.FProjects.Add(project.ProjectFile);
       item.AddCurrentVersion(node.Version);
     end;
-    if not item.FProjects.Any then
+    if not found then
       FPlan.AddError(TErrorCode.E3002_PackageNotInstalled, info.Id + ' is not installed in any of the projects - there is nothing to change.');
   end;
   FPlan.CollectProjects(FProjects);

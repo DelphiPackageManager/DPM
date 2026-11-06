@@ -48,6 +48,14 @@ uses
 type
   IPackageInstallerContext = interface;
 
+  ///<summary> A project an upgrade leaves unchanged : the package is only a dependency there, and a package that depends
+  ///  on it doesn't accept the new version. </summary>
+  TPlanBlockedProject = record
+    ProjectFile : string;
+    //'<parent id> <parent version> requires <id> <range>'
+    Reason : string;
+  end;
+
   ///<summary> A package an install will apply, and where. </summary>
   IInstallPlanItem = interface
     ['{4B0B8D5E-1D52-4E7B-9C1B-6A7E3B2F9D10}']
@@ -56,18 +64,24 @@ type
     function GetCurrentVersion : TPackageVersion;
     function GetReason : string;
     function GetProjects : IList<string>;
+    function GetTransitiveProjects : IList<string>;
+    function GetBlockedProjects : IList<TPlanBlockedProject>;
     //'<installed versions> -> <new version>' for the summary - every installed version that changes, lowest
     //first, since the projects needn't agree. Just the new version when no project changes version.
     function VersionChangeText : string;
     property PackageInfo : IPackageInfo read GetPackageInfo;
     //true when the package was not asked for, but is upgraded because it blocks the packages that were.
     property IsCompanion : boolean read GetIsCompanion;
-    //the highest version currently referenced at the top level of the plan's projects - empty if none.
+    //the highest version currently referenced in the plan's projects, as a top level or a dependency - empty if none.
     property CurrentVersion : TPackageVersion read GetCurrentVersion;
     //why a companion is included.
     property Reason : string read GetReason;
-    //the projects the package is applied to.
+    //the projects the package is applied to as a top level.
     property Projects : IList<string> read GetProjects;
+    //the projects where the package is only a dependency, changed in place under its parents.
+    property TransitiveProjects : IList<string> read GetTransitiveProjects;
+    //the projects an upgrade leaves unchanged because a package depending on this one doesn't accept the version.
+    property BlockedProjects : IList<TPlanBlockedProject> read GetBlockedProjects;
   end;
 
   ///<summary> Why a plan can't go ahead - reported (once) by LogPlanErrors in DPM.Core.Package.InstallPlan. </summary>
@@ -90,6 +104,8 @@ type
     function HasCompanions : boolean;
     //the packages to apply to a project, requested ones first.
     function PackagesForProject(const projectFile : string) : IList<IPackageInfo>;
+    //the packages to change in place in a project - see TransitiveProjects.
+    function PinsForProject(const projectFile : string) : IList<IPackageInfo>;
     //a human readable description, shared by the command line log and the IDE's confirmation.
     function SummaryLines : IList<string>;
     property Succeeded : boolean read GetSucceeded;
@@ -109,8 +125,9 @@ type
     ['{C7A51E26-0F3B-4D98-8E2A-5B6C9D1F3A47}']
     ///<summary> requested : the packages asked for, at concrete versions.
     ///  upgrade = false : every requested package is applied to every project.
-    ///  upgrade = true (changing installed versions, up or down) : a package is only applied to projects where
-    ///  it is a top level reference, and other top level packages that would block the change (they pin a
+    ///  upgrade = true (changing installed versions, up or down) : a package is applied to projects where
+    ///  it is a top level reference, and changed in place where it is only a dependency when every package
+    ///  depending on it accepts the version. Other top level packages that would block the change (they pin a
     ///  dependency the requested packages need at another version) are added as companions, at their newest
     ///  compatible version - moving the same way as the requested packages, never the other way. </summary>
     function Plan(const cancellationToken : ICancellationToken; const config : IConfiguration; const options : TSearchOptions;
