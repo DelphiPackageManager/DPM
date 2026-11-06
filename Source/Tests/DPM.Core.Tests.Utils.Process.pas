@@ -22,6 +22,9 @@ type
     //stdout and stderr are read separately - an unfinished line on one is never joined to a line from the other.
     [Test]
     procedure Run_Keeps_Stdout_And_Stderr_Lines_Apart;
+    //the last line of the output is delivered even though the process never ended it with a line end.
+    [Test]
+    procedure Run_Delivers_A_Last_Line_Without_A_Line_End;
     //a compile run on the IDE's main thread keeps the IDE responsive.
     [Test]
     procedure Run_Pumps_The_Host_On_The_Main_Thread;
@@ -173,6 +176,25 @@ begin
       end, TEncoding.Default, errorMessage), errorMessage);
     Assert.IsTrue(lines.IndexOf('partialdone') >= 0, lines.Text);
     Assert.IsTrue(lines.IndexOf('err') >= 0, lines.Text);
+  finally
+    lines.Free;
+  end;
+end;
+
+procedure TProcessTests.Run_Delivers_A_Last_Line_Without_A_Line_End;
+var
+  lines : TStringList;
+  errorMessage : string;
+begin
+  lines := TStringList.Create;
+  try
+    Assert.IsTrue(TProcessRunner.Run(NewCmd('echo first& <nul set /p =tail'), TCancellationTokenSourceFactory.Create.Token,
+      procedure(const line : string)
+      begin
+        lines.Add(Trim(line));
+      end, TEncoding.Default, errorMessage), errorMessage);
+    Assert.IsTrue(lines.IndexOf('first') >= 0, lines.Text);
+    Assert.IsTrue(lines.IndexOf('tail') >= 0, lines.Text);
   finally
     lines.Free;
   end;

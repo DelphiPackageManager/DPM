@@ -170,7 +170,6 @@ var
   i : integer;
 begin
   result := false;
-  started := false;
   FPlatform := platform;
   FBuildForDesign := forDesign;
   //the last build's output.
@@ -248,6 +247,9 @@ begin
       FLogger.Error(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to run msbuild to compile [' + projectFile + '] : ' + errorMessage);
     exit;
   end;
+
+  if process.Errors.Count > 0 then
+    FLogger.Debug('msbuild process diagnostics : ' + Trim(process.Errors.Text));
 
   result := (process.Status = TProcessStatus.Exited) and (process.ExitCode = 0);
   if result or cancellationToken.IsCancelled then

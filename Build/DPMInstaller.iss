@@ -36,6 +36,7 @@ DisableProgramGroupPage=yes
 DisableWelcomePage=no
 LicenseFile=..\LICENSE.txt
 ; need admin if we want to 
+; dpm upgrade starts this installer with CreateProcess (LaunchInstaller in Source\Core\Upgrade\DPM.Core.Upgrade.Github.pas) - requiring admin here would make that fail with ERROR_ELEVATION_REQUIRED (740).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputBaseFilename={#OutputFileName}

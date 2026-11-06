@@ -41,6 +41,9 @@ type
     procedure Build_ThatFails_ShowsTheOutputThenTheError;
     [Test]
     procedure Build_ThatFails_DoesNotRepeatOutputAlreadyShown;
+    //the owner of the token reports a cancellation - the build reports nothing.
+    [Test]
+    procedure Build_ThatIsCancelled_ReportsNothing;
   end;
 
 implementation
@@ -333,6 +336,25 @@ begin
   Assert.IsTrue(logger.Logged('verbose', 'compiling Pkg.dpk'), logger.Messages.Text);
   Assert.IsFalse(logger.Logged('information', 'compiling Pkg.dpk'), 'shown twice : ' + logger.Messages.Text);
   Assert.IsTrue(logger.HasError(TErrorCode.E5003_PackageCompileFailed), logger.Messages.Text);
+end;
+
+procedure TMSBuildCompilerTests.Build_ThatIsCancelled_ReportsNothing;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  compiler : ICompiler;
+  cancellation : ICancellationTokenSource;
+begin
+  WriteBatch(FMSBuild, '@echo off'#13#10'exit /b 0'#13#10);
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  compiler := NewCompiler(TFakeEnvironment.Create(TPath.Combine(FRoot, 'Studio'), FRsVars, FMSBuild), '', loggerIntf,
+                          cDefaultCompilerOutputLogLevel, cDefaultCompilerVerbosity);
+  cancellation := TCancellationTokenSourceFactory.Create;
+  cancellation.Cancel;
+  Assert.IsFalse(compiler.BuildProject(cancellation.Token, TDPMPlatform.Win32, FProject, 'Release', TPackageVersion.Parse('1.0.0')));
+  Assert.AreEqual(0, loggerIntf.ErrorCount, logger.Messages.Text);
+  Assert.IsFalse(logger.HasError(TErrorCode.E5002_CompilerLaunchFailed), logger.Messages.Text);
 end;
 
 initialization

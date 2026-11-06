@@ -50,7 +50,10 @@ type
     ///  to a line from the other. With onLine nil the output is not read.
     ///  The wait goes through WaitForAnyHandle, so on the main thread of a UI host that installed ProcessMessagePump
     ///  the host keeps running. cancellationToken and StartInfo.TimeoutInMSec stop the run - the whole process tree.
-    ///  Returns false when the process could not be started, with errorMessage saying why. Otherwise true, and
+    ///  Returns false when the process could not be started (an exception raised while starting it included), with
+    ///  errorMessage saying why. A token that is already cancelled also returns false (errorMessage says so) - check
+    ///  cancellationToken.IsCancelled before reporting a failure to start. Run attaches its own pipe targets to
+    ///  process, which stay attached - give it a process that has not been through Run before. Otherwise true, and
     ///  process.Status, ExitCode and TimedOut say how the run ended. If onLine raises, the run is stopped and waited
     ///  for, then the exception is raised again. </summary>
     class function Run(const process : IProcess; const cancellationToken : ICancellationToken;
@@ -247,6 +250,9 @@ var
   lines : TStringList;
   waitResult : Cardinal;
   done : boolean;
+  started : boolean;
+  waitError : Cardinal;
+  waitException : EOSError;
 begin
   result := false;
   errorMessage := '';
@@ -259,7 +265,17 @@ begin
   end;
 
   //validation failed, the OS refused, or the token was already cancelled.
-  if not process.ExecuteAsync(cancellationToken) then
+  //ExecuteAsync can also raise (pipe or threadpool creation failed). Nothing is running then, so nothing to stop.
+  try
+    started := process.ExecuteAsync(cancellationToken);
+  except
+    on e : Exception do
+    begin
+      errorMessage := e.Message;
+      exit;
+    end;
+  end;
+  if not started then
   begin
     errorMessage := Trim(process.Errors.Text);
     if errorMessage = '' then
@@ -277,6 +293,7 @@ begin
           waitResult := WaitForAnyHandle([process.CompletionHandle, queue.Handle], INFINITE)
         else
           waitResult := WaitForAnyHandle([process.CompletionHandle], INFINITE);
+        waitError := GetLastError;
         case waitResult of
           WAIT_OBJECT_0 :
             begin
@@ -288,8 +305,12 @@ begin
           WAIT_OBJECT_0 + 1 :
             Deliver(queue, lines, onLine);
         else
-          raise EOSError.CreateFmt('Unexpected result %d waiting for [%s] : %s',
-                                   [waitResult, process.StartInfo.Executable, SysErrorMessage(GetLastError)]);
+          begin
+            waitException := EOSError.CreateFmt('Unexpected result %d waiting for [%s] : %s',
+                                   [waitResult, process.StartInfo.Executable, SysErrorMessage(waitError)]);
+            waitException.ErrorCode := waitError;
+            raise waitException;
+          end;
         end;
       end;
     except

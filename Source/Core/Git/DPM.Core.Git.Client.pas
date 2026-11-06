@@ -278,7 +278,10 @@ begin
     exit;
   end;
   result := process.ExitCode;
-  if process.TimedOut then
+  if process.Errors.Count > 0 then
+    FLogger.Debug('[git] process diagnostics : ' + Trim(process.Errors.Text));
+  //Status, not TimedOut : a child that exits right at its deadline has TimedOut set but Status Exited.
+  if process.Status = TProcessStatus.TimedOut then
     output.Insert(0, 'git did not finish within ' + IntToStr(FTimeoutSeconds) + ' seconds - it was stopped.');
 end;
 
