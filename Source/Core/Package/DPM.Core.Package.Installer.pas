@@ -580,6 +580,7 @@ begin
   if config = nil then
     exit;
   FPackageCache.Location := config.PackageCacheLocation;
+  FCompilerFactory.SetOutputSettings(config.CompilerOutput.LogLevel, config.CompilerOutput.MSBuildVerbosity);
 
   if not LoadProjectEditor(projectFile, config, compilerVersion, projectEditor) then
     exit;
@@ -2797,6 +2798,7 @@ begin
     exit;
 
   FPackageCache.Location := result.PackageCacheLocation;
+  FCompilerFactory.SetOutputSettings(result.CompilerOutput.LogLevel, result.CompilerOutput.MSBuildVerbosity);
 
   //the repository manager says why a source isn't valid.
   if not FRepositoryManager.Initialize(result) then

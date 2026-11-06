@@ -28,6 +28,19 @@ type
     procedure CommandLine_RunsEverythingByItsFullPath;
     [Test]
     procedure Build_DoesNotRunACmdOrMSBuildInTheCurrentFolder;
+    //msbuild is told the configured verbosity.
+    [Test]
+    procedure CommandLine_PassesTheMSBuildVerbosity;
+    //which (log level, logger verbosity) pairs show compiler output as it arrives.
+    [Test]
+    procedure OutputIsShownLive_WhenTheLoggerShowsItsLevel;
+    [Test]
+    procedure Build_LogsTheOutputAsItArrives;
+    //a failed compile shows what msbuild said, then the error - the error is the last thing shown.
+    [Test]
+    procedure Build_ThatFails_ShowsTheOutputThenTheError;
+    [Test]
+    procedure Build_ThatFails_DoesNotRepeatOutputAlreadyShown;
   end;
 
 implementation
@@ -41,6 +54,7 @@ uses
   VSoft.CancellationToken.Impl,
   DPM.Core.Types,
   DPM.Core.Logging,
+  DPM.Core.Diagnostics,
   DPM.Core.Compiler.Interfaces,
   DPM.Core.Compiler.MSBuild,
   TestLogger;
@@ -117,12 +131,18 @@ const
     '    </ItemGroup>'#13#10 +
     '</Project>'#13#10;
 
-function NewCompiler(const env : ICompilerEnvironmentProvider; const cacheFolder : string) : ICompiler;
+function NewCompiler(const env : ICompilerEnvironmentProvider; const cacheFolder : string; const logger : ILogger;
+                     const logLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity) : ICompiler; overload;
+begin
+  result := TMSBuildCompilerAccess.Create(logger, TCompilerVersion.Delphi12_0, TDPMPlatform.Win32, env, cacheFolder, logLevel, msbuildVerbosity);
+end;
+
+function NewCompiler(const env : ICompilerEnvironmentProvider; const cacheFolder : string) : ICompiler; overload;
 var
   logger : ILogger;
 begin
   logger := TTestLogger.Create;
-  result := TMSBuildCompilerAccess.Create(logger, TCompilerVersion.Delphi12_0, TDPMPlatform.Win32, env, cacheFolder);
+  result := NewCompiler(env, cacheFolder, logger, cDefaultCompilerOutputLogLevel, cDefaultCompilerVerbosity);
 end;
 
 procedure WriteBatch(const fileName : string; const text : string);
@@ -180,8 +200,9 @@ begin
   commandLine := (NewCompiler(TFakeEnvironment.Create(TPath.Combine(FRoot, 'Studio'), FRsVars, FMSBuild), '') as TMSBuildCompilerAccess)
                    .GetCommandLine(TDPMPlatform.Win32, FProject, 'Release', TPackageVersion.Parse('1.0.0'));
   Assert.Contains(commandLine, 'call "' + FRsVars + '" && "' + FMSBuild + '" "' + FProject + '"');
-  //every path quoted - the folder has a space in it - and errors go to the log as well.
-  Assert.Contains(commandLine, ' 2>&1"');
+  //every path quoted - the folder has a space in it. The output comes back through pipes - nothing is redirected.
+  Assert.DoesNotContain(commandLine, '2>&1');
+  Assert.DoesNotContain(commandLine, ') > ');
   Assert.DoesNotContain(commandLine, ' msbuild ', true);
   Assert.IsFalse(commandLine.EndsWith(';'), commandLine);
 end;
@@ -218,6 +239,100 @@ begin
   end;
   Assert.IsFalse(FileExists(planted), 'an msbuild.bat in the current folder ran');
   Assert.IsTrue(FileExists(TPath.Combine(FRoot, 'ran-real.txt')), 'the compiler''s own MSBuild did not run - a cmd.exe in the current folder may have');
+end;
+
+procedure TMSBuildCompilerTests.CommandLine_PassesTheMSBuildVerbosity;
+var
+  logger : ILogger;
+  commandLine : string;
+begin
+  logger := TTestLogger.Create;
+  commandLine := (NewCompiler(TFakeEnvironment.Create(TPath.Combine(FRoot, 'Studio'), FRsVars, FMSBuild), '', logger,
+                              TCompilerOutputLogLevel.Verbose, TCompilerVerbosity.Detailed) as TMSBuildCompilerAccess)
+                   .GetCommandLine(TDPMPlatform.Win32, FProject, 'Release', TPackageVersion.Parse('1.0.0'));
+  Assert.Contains(commandLine, ' /v:detailed ');
+end;
+
+procedure TMSBuildCompilerTests.OutputIsShownLive_WhenTheLoggerShowsItsLevel;
+const
+  //                                                       Quiet  Normal Detailed Debug
+  cExpected : array[TCompilerOutputLogLevel, TVerbosity] of boolean = (
+                                                          (false, false, true,    true),   //Verbose
+                                                          (false, true,  true,    true));  //Information
+var
+  level : TCompilerOutputLogLevel;
+  verbosity : TVerbosity;
+begin
+  for level := Low(TCompilerOutputLogLevel) to High(TCompilerOutputLogLevel) do
+    for verbosity := Low(TVerbosity) to High(TVerbosity) do
+      Assert.IsTrue(cExpected[level, verbosity] = TMSBuildCompiler.ShowsOutputLive(level, verbosity),
+                    'log level ' + cCompilerOutputLogLevelNames[level] + ', logger verbosity ' + IntToStr(Ord(verbosity)));
+end;
+
+procedure TMSBuildCompilerTests.Build_LogsTheOutputAsItArrives;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  compiler : ICompiler;
+begin
+  WriteBatch(FMSBuild, '@echo off'#13#10'echo compiling Pkg.dpk'#13#10'exit /b 0'#13#10);
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  loggerIntf.Verbosity := TVerbosity.Detailed;
+  compiler := NewCompiler(TFakeEnvironment.Create(TPath.Combine(FRoot, 'Studio'), FRsVars, FMSBuild), '', loggerIntf,
+                          TCompilerOutputLogLevel.Verbose, TCompilerVerbosity.Normal);
+  Assert.IsTrue(compiler.BuildProject(TCancellationTokenSourceFactory.Create.Token, TDPMPlatform.Win32, FProject, 'Release', TPackageVersion.Parse('1.0.0')), logger.Messages.Text);
+  Assert.IsTrue(logger.Logged('verbose', 'compiling Pkg.dpk'), logger.Messages.Text);
+  Assert.IsTrue(compiler.CompilerOutput.IndexOf('compiling Pkg.dpk') >= 0, compiler.CompilerOutput.Text);
+end;
+
+procedure TMSBuildCompilerTests.Build_ThatFails_ShowsTheOutputThenTheError;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  compiler : ICompiler;
+  outputLine : integer;
+  errorLine : integer;
+  i : integer;
+begin
+  WriteBatch(FMSBuild, '@echo off'#13#10'echo compiling Pkg.dpk'#13#10'exit /b 1'#13#10);
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  //Verbose lines aren't shown at Normal - so nothing was shown live.
+  loggerIntf.Verbosity := TVerbosity.Normal;
+  compiler := NewCompiler(TFakeEnvironment.Create(TPath.Combine(FRoot, 'Studio'), FRsVars, FMSBuild), '', loggerIntf,
+                          TCompilerOutputLogLevel.Verbose, TCompilerVerbosity.Normal);
+  Assert.IsFalse(compiler.BuildProject(TCancellationTokenSourceFactory.Create.Token, TDPMPlatform.Win32, FProject, 'Release', TPackageVersion.Parse('1.0.0')));
+  Assert.IsTrue(logger.HasError(TErrorCode.E5003_PackageCompileFailed), logger.Messages.Text);
+  outputLine := -1;
+  errorLine := -1;
+  for i := 0 to logger.Messages.Count - 1 do
+  begin
+    if (outputLine < 0) and (Pos('information: compiling Pkg.dpk', logger.Messages[i]) = 1) then
+      outputLine := i;
+    if (errorLine < 0) and (Pos('DPME5003', logger.Messages[i]) > 0) then
+      errorLine := i;
+  end;
+  Assert.IsTrue(outputLine >= 0, 'the output was not shown : ' + logger.Messages.Text);
+  Assert.IsTrue(outputLine < errorLine, 'the error must come after the output : ' + logger.Messages.Text);
+end;
+
+procedure TMSBuildCompilerTests.Build_ThatFails_DoesNotRepeatOutputAlreadyShown;
+var
+  logger : TTestLogger;
+  loggerIntf : ILogger;
+  compiler : ICompiler;
+begin
+  WriteBatch(FMSBuild, '@echo off'#13#10'echo compiling Pkg.dpk'#13#10'exit /b 1'#13#10);
+  logger := TTestLogger.Create;
+  loggerIntf := logger;
+  loggerIntf.Verbosity := TVerbosity.Detailed;
+  compiler := NewCompiler(TFakeEnvironment.Create(TPath.Combine(FRoot, 'Studio'), FRsVars, FMSBuild), '', loggerIntf,
+                          TCompilerOutputLogLevel.Verbose, TCompilerVerbosity.Normal);
+  Assert.IsFalse(compiler.BuildProject(TCancellationTokenSourceFactory.Create.Token, TDPMPlatform.Win32, FProject, 'Release', TPackageVersion.Parse('1.0.0')));
+  Assert.IsTrue(logger.Logged('verbose', 'compiling Pkg.dpk'), logger.Messages.Text);
+  Assert.IsFalse(logger.Logged('information', 'compiling Pkg.dpk'), 'shown twice : ' + logger.Messages.Text);
+  Assert.IsTrue(logger.HasError(TErrorCode.E5003_PackageCompileFailed), logger.Messages.Text);
 end;
 
 initialization

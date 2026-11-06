@@ -275,6 +275,7 @@ type
     function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
     //false for NoFMXPlatforms.
     function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    procedure SetOutputSettings(const logLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
   public
     //the builds for failPlatforms fail whatever outcome says - a platform the machine can't build for.
     constructor Create(const logger : ILogger; const outcome : TCompileOutcome; const cancellation : ICancellationTokenSource;
@@ -654,6 +655,11 @@ begin
     reason := ''
   else
     reason := 'FMX is not installed for it (test)';
+end;
+
+procedure TFakeCompilerFactory.SetOutputSettings(const logLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
+begin
+  //the fake compilers don't run msbuild.
 end;
 
 { TExtractedPackageCache }

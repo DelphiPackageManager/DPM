@@ -337,7 +337,8 @@ var
 begin
   logger := TTestLogger.Create;
   loggerIntf := logger;
-  compiler := TMSBuildCompiler.Create(loggerIntf, cTestCompiler, TDPMPlatform.Win32, TMissingCompilerEnvironment.Create, '');
+  compiler := TMSBuildCompiler.Create(loggerIntf, cTestCompiler, TDPMPlatform.Win32, TMissingCompilerEnvironment.Create, '',
+                                      cDefaultCompilerOutputLogLevel, cDefaultCompilerVerbosity);
   Assert.IsFalse(compiler.BuildProject(TCancellationTokenSourceFactory.Create.Token, TDPMPlatform.Win32, 'C:\nowhere\pkg.dproj', 'Release', TPackageVersion.Parse('1.0.0')));
   Assert.AreEqual(1, loggerIntf.ErrorCount, logger.Messages.Text);
   Assert.IsTrue(logger.HasError(TErrorCode.E5001_CompilerNotInstalled), logger.Messages.Text);

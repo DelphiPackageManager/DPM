@@ -41,11 +41,14 @@ type
     FLogger : ILogger;
     FEnv : ICompilerEnvironmentProvider;
     FPackageCache : IPackageCache;
+    FOutputLogLevel : TCompilerOutputLogLevel;
+    FMSBuildVerbosity : TCompilerVerbosity;
   protected
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler; overload;
     function CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const logger : ILogger) : ICompiler; overload;
     function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
     function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    procedure SetOutputSettings(const logLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
   public
     constructor Create(const logger : ILogger; const env : ICompilerEnvironmentProvider; const packageCache : IPackageCache);
   end;
@@ -72,6 +75,14 @@ begin
   FLogger := logger;
   FEnv := env;
   FPackageCache := packageCache;
+  FOutputLogLevel := cDefaultCompilerOutputLogLevel;
+  FMSBuildVerbosity := cDefaultCompilerVerbosity;
+end;
+
+procedure TCompilerFactory.SetOutputSettings(const logLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
+begin
+  FOutputLogLevel := logLevel;
+  FMSBuildVerbosity := msbuildVerbosity;
 end;
 
 function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform) : ICompiler;
@@ -83,7 +94,7 @@ function TCompilerFactory.CreateCompiler(const compilerVersion : TCompilerVersio
 begin
   //if we have different compiler implementations then work that out here.
   //the cache root a package's dproj sees as $(DPMCache) - read now, it is set from the configuration.
-  result := TMSBuildCompiler.Create(logger, compilerVersion, platform, FEnv, FPackageCache.PackagesFolder);
+  result := TMSBuildCompiler.Create(logger, compilerVersion, platform, FEnv, FPackageCache.PackagesFolder, FOutputLogLevel, FMSBuildVerbosity);
 end;
 
 end.

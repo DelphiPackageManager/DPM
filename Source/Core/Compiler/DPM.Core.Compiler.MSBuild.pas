@@ -42,7 +42,6 @@ type
   private
     FLogger : ILogger;
     FEnv : ICompilerEnvironmentProvider;
-    FCompilerLogFile : string;
 
     FBPLOutput : string;
     FLibOutput : string;
@@ -53,12 +52,17 @@ type
     FPlatform : TDPMPlatform;
     FSearchPaths : IList<string>;
     FVerbosity : TCompilerVerbosity;
+    //the level compiler output is logged at, as it arrives - see ShowsOutputLive.
+    FOutputLogLevel : TCompilerOutputLogLevel;
 
     FCompilerOutput : TStringList;
 
     FBuildForDesign : boolean;
     //the package cache root - what a package's dproj sees as $(DPMCache).
     FPackageCacheFolder : string;
+
+    //logs a line of compiler output at FOutputLogLevel.
+    procedure LogOutputLine(const line : string);
   protected
     function GetBPLOutput : string;
     function GetCompilerVersion : TCompilerVersion;
@@ -89,8 +93,13 @@ type
     function BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
   public
     constructor Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider;
-                       const packageCacheFolder : string);
+                       const packageCacheFolder : string; const outputLogLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
     destructor Destroy; override;
+
+    ///<summary> Whether compiler output logged at logLevel is shown by a logger at verbosity - TBaseLogger.IsEnabled's
+    ///  rule : Verbose from Detailed up, Information from Normal up. When it is, each line is logged as it arrives;
+    ///  when it isn't, a failed compile's output is logged afterwards, at Information. </summary>
+    class function ShowsOutputLive(const logLevel : TCompilerOutputLogLevel; const verbosity : TVerbosity) : boolean;
 
   end;
 
@@ -100,10 +109,10 @@ uses
   WinApi.Windows,
   WinApi.ShlObj,
   System.SysUtils,
-  System.IOUtils,
   DPM.Core.Diagnostics,
   DPM.Core.Utils.Path,
   DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Compiler.ProjectSettings;
 
 
@@ -148,35 +157,24 @@ begin
   result := ' /p:' + name + '=' + TPathUtils.QuotePath(ExcludeTrailingPathDelimiter(path), true);
 end;
 
-//The log is ours to tidy up - not something a build fails over.
-procedure DeleteCompilerLog(const logger : ILogger; const fileName : string);
-begin
-  try
-    if TFile.Exists(fileName) then
-      TFile.Delete(fileName);
-  except
-    on e : Exception do
-      logger.Debug('Unable to delete the compiler log [' + fileName + '] : ' + e.Message);
-  end;
-end;
-
 { TMSBuildCompiler }
 
 function TMSBuildCompiler.BuildProject(const cancellationToken : ICancellationToken; const platform : TDPMPlatform; const projectFile : string; const configName : string; const packageVersion : TPackageVersion; const forDesign : boolean) : Boolean;
 var
   commandLine : string;
-  env : IEnvironmentBlock;
-  i : integer;
-  exitCode : Cardinal;
+  process : IProcess;
   oemEncoding : TEncoding;
+  showLive : boolean;
+  started : boolean;
+  errorMessage : string;
+  i : integer;
 begin
-
   result := false;
+  started := false;
   FPlatform := platform;
   FBuildForDesign := forDesign;
+  //the last build's output.
   FCompilerOutput.Clear;
-
-  FCompilerLogFile := TPath.GetTempFileName;
   FProjectFile := projectFile;
 
   try
@@ -186,23 +184,9 @@ begin
     on e : Exception do
     begin
       LogException(FLogger, e);
-      DeleteCompilerLog(FLogger, FCompilerLogFile);
       exit;
     end;
   end;
-
-  env := TEnvironmentBlockFactory.Create(nil, true);
-  {$IFDEF DEBUG}
-  //THE IDE set these, which makes it difficult to debug the command line version.
-  env.RemoveVariable('BDS');
-  env.RemoveVariable('BDSLIB');
-  env.RemoveVariable('BDSINCLUDE');
-  env.RemoveVariable('BDSCOMMONDIR');
-  {$ENDIF}
-  env.RemoveVariable('PLATFORM');
-  //cmd looks for a command in the current folder before the PATH unless this is set - and a package's own folder
-  //could hold an msbuild.bat. Everything is run by its full path anyway; this covers what msbuild itself starts.
-  env.AddOrSet('NoDefaultCurrentDirectoryInExePath', '1');
 
   //EnvOptions.proj is the IDE's environment - the per platform library paths and the selected
   //platform SDK. CodeGear.Common.Targets imports it unless ImportEnvOptions is exactly 'false'.
@@ -218,53 +202,95 @@ begin
   //Note the unit search path stays under our control either way - we pass DCC_UnitSearchPath as a
   //global (command line) property, which wins over anything the project or EnvOptions sets.
   //(ImportEnvOptions=false is passed as a global property for these - see GetMSBuildParameters.)
-  FLogger.Debug('Compler - cmdline : ' + commandLine);
+  FLogger.Debug('Compiler - cmdline : ' + commandLine);
+  showLive := ShowsOutputLive(FOutputLogLevel, FLogger.Verbosity);
+  //the child has a console of its own, so msbuild writes in its code page - the OEM one.
+  oemEncoding := TEncoding.GetEncoding(GetOEMCP);
   try
-    exitCode := TProcess.Execute2(cancellationToken, CmdExePath, commandLine,'',env);
-  except
-    on e : Exception do
-    begin
-      FLogger.Error(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to run msbuild to compile [' + projectFile + '] : ' + e.Message);
-      DeleteCompilerLog(FLogger, FCompilerLogFile);
-      exit;
-    end;
-  end;
-  result := exitCode = 0;
-  //TODO : Doesn't give realtime feedback, remove when we have a CreateProcess version of TProcess.
-  if TFile.Exists(FCompilerLogFile) then
-  begin
-    if (not result) and (not cancellationToken.IsCancelled) then
-    begin
-      //what cmd redirected - console output, in the OEM code page.
-      oemEncoding := TEncoding.GetEncoding(GetOEMCP);
-      try
-        FCompilerOutput.LoadFromFile(FCompilerLogFile, oemEncoding);
-      finally
-        oemEncoding.Free;
+    try
+      process := TProcess.Create;
+      process.StartInfo.Executable := CmdExePath;
+      process.CommandLine.Add(commandLine, TQuoted.qtNone);
+      {$IFDEF DEBUG}
+      //THE IDE set these, which makes it difficult to debug the command line version.
+      process.Environment.Remove('BDS');
+      process.Environment.Remove('BDSLIB');
+      process.Environment.Remove('BDSINCLUDE');
+      process.Environment.Remove('BDSCOMMONDIR');
+      {$ENDIF}
+      process.Environment.Remove('PLATFORM');
+      //cmd looks for a command in the current folder before the PATH unless this is set - and a package's own folder
+      //could hold an msbuild.bat. Everything is run by its full path anyway; this covers what msbuild itself starts.
+      process.Environment.AddOrSet('NoDefaultCurrentDirectoryInExePath', '1');
+      //no timeout - the cancellation token stops a build.
+      started := TProcessRunner.Run(process, cancellationToken,
+        procedure(const line : string)
+        begin
+          FCompilerOutput.Add(line);
+          if showLive then
+            LogOutputLine(line);
+        end, oemEncoding, errorMessage);
+    except
+      on e : Exception do
+      begin
+        FLogger.Error(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to run msbuild to compile [' + projectFile + '] : ' + e.Message);
+        exit;
       end;
-      for i := 0 to FCompilerOutput.Count -1 do
-        FLogger.Information(FCompilerOutput.Strings[i]);
-      FCompilerOutput.Clear;
     end;
-    DeleteCompilerLog(FLogger, FCompilerLogFile);
+  finally
+    oemEncoding.Free;
   end;
-  //after the output, so the error is the last thing shown. A cancelled build is not a failure to
-  //report - the operation reports the cancellation.
-  if (not result) and (not cancellationToken.IsCancelled) then
-    FLogger.Error(TErrorCode.E5003_PackageCompileFailed, 'Compiling [' + projectFile + '] for ' + DPMPlatformToString(platform) +
-                  ' failed (msbuild exit code ' + IntToStr(exitCode) + ') - see the compiler output above.');
+
+  //A cancelled build is not a failure to report - the operation reports the cancellation.
+  if not started then
+  begin
+    if not cancellationToken.IsCancelled then
+      FLogger.Error(TErrorCode.E5002_CompilerLaunchFailed, 'Unable to run msbuild to compile [' + projectFile + '] : ' + errorMessage);
+    exit;
+  end;
+
+  result := (process.Status = TProcessStatus.Exited) and (process.ExitCode = 0);
+  if result or cancellationToken.IsCancelled then
+    exit;
+  //what msbuild said, unless it was shown as it arrived - then the error, so it is the last thing shown.
+  if not showLive then
+  begin
+    for i := 0 to FCompilerOutput.Count - 1 do
+      FLogger.Information(FCompilerOutput.Strings[i]);
+  end;
+  FLogger.Error(TErrorCode.E5003_PackageCompileFailed, 'Compiling [' + projectFile + '] for ' + DPMPlatformToString(platform) +
+                ' failed (msbuild exit code ' + IntToStr(process.ExitCode) + ') - see the compiler output above.');
 end;
 
 constructor TMSBuildCompiler.Create(const logger : ILogger; const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; const env : ICompilerEnvironmentProvider;
-                                    const packageCacheFolder : string);
+                                    const packageCacheFolder : string; const outputLogLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
 begin
   FLogger := logger;
   FPackageCacheFolder := packageCacheFolder;
   FCompilerVersion := compilerVersion;
   FPlatform := platform;
   FEnv := env;
+  FOutputLogLevel := outputLogLevel;
+  FVerbosity := msbuildVerbosity;
   FSearchPaths := TCollections.CreateList<string>;
   FCompilerOutput := TStringList.Create;
+end;
+
+class function TMSBuildCompiler.ShowsOutputLive(const logLevel : TCompilerOutputLogLevel; const verbosity : TVerbosity) : boolean;
+begin
+  case logLevel of
+    TCompilerOutputLogLevel.Verbose : result := verbosity >= TVerbosity.Detailed;
+  else
+    result := verbosity >= TVerbosity.Normal;
+  end;
+end;
+
+procedure TMSBuildCompiler.LogOutputLine(const line : string);
+begin
+  if FOutputLogLevel = TCompilerOutputLogLevel.Verbose then
+    FLogger.Verbose(line)
+  else
+    FLogger.Information(line);
 end;
 
 destructor TMSBuildCompiler.Destroy;
@@ -287,12 +313,11 @@ function TMSBuildCompiler.GetCommandLine(const platform : TDPMPlatform; const pr
 begin
   FProjectFile := projectFile;
   //cmd.exe runs rsvars.bat - the compiler's environment - then MSBuild.exe by its full path, never an 'msbuild' looked
-  //up on the PATH (cmd looks in the current folder first). Both go to the log, errors included. /s /c "..." makes cmd
+  //up on the PATH (cmd looks in the current folder first). The output comes back through pipes. /s /c "..." makes cmd
   //strip just the outer quotes, so every path inside can be quoted.
-  result := '/s /c "(call ' + TPathUtils.QuotePath(FEnv.GetRsVarsFilePath(platform, FCompilerVersion), true) +
+  result := '/s /c "call ' + TPathUtils.QuotePath(FEnv.GetRsVarsFilePath(platform, FCompilerVersion), true) +
             ' && ' + TPathUtils.QuotePath(FEnv.GetMSBuildPath(platform, FCompilerVersion), true) +
-            ' ' + TPathUtils.QuotePath(projectFile, true) + ' ' + GetMSBuildParameters(configName, packageVersion) +
-            ') > ' + TPathUtils.QuotePath(FCompilerLogFile, true) + ' 2>&1"';
+            ' ' + TPathUtils.QuotePath(projectFile, true) + ' ' + GetMSBuildParameters(configName, packageVersion) + '"';
 end;
 
 function TMSBuildCompiler.GetCompilerOutput : TStrings;
@@ -322,6 +347,8 @@ begin
   result := '/target:BuildVersionResource;Build';
   result := result + ' /p:Config=' + configName;
   result := result + ' /p:Platform=' + DPMPlatformToBDString(FPlatform);
+  //how much msbuild writes - the configuration's compilerOutput.msbuildVerbosity.
+  result := result + ' /v:' + cCompilerVerbosityNames[FVerbosity];
 
   //THIS DOES NOT WORK!!!
   //attempting to update version info
@@ -404,8 +431,6 @@ begin
     result := result + ' /p:ImportEnvOptions=false';
 
   result := result + ' /p:DCC_UnitSearchPath=' +  GetProjectSearchPath(configName);
-
-  //result := result +  ' /v:diag';
  end;
 
 

@@ -102,6 +102,9 @@ type
     function CanBuildPlatform(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
     //Whether FireMonkey packages can be built for platform - see ICompilerEnvironmentProvider.CanBuildFMX.
     function CanBuildFMX(const compilerVersion : TCompilerVersion; const platform : TDPMPlatform; out reason : string) : boolean;
+    //How the compilers created from now on show their output - the configuration's compilerOutput section. The installer
+    //sets it each time it loads the configuration.
+    procedure SetOutputSettings(const logLevel : TCompilerOutputLogLevel; const msbuildVerbosity : TCompilerVerbosity);
   end;
 
 implementation
