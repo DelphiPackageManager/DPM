@@ -30,7 +30,9 @@ interface
 
 uses
   System.Classes,
-  VSoft.CancellationToken;
+  System.SysUtils,
+  VSoft.CancellationToken,
+  VSoft.Process;
 
 type
   IEnvironmentBlock = interface
@@ -73,6 +75,28 @@ type
 
   TProcessMessagePumpProc = procedure;
 
+  //A line of a process's output - from stdout or stderr - without its line end.
+  TProcessOutputLineProc = reference to procedure(const line : string);
+
+  TProcessRunner = class
+  public
+    ///<summary> Runs a configured process and waits on the calling thread until the run has completed - its output
+    ///  delivered and its handles closed. The caller sets the process up (executable, arguments, working folder,
+    ///  environment, timeout) and attaches no stdout / stderr targets of its own.
+    ///  With onLine assigned, each line the process writes to stdout or stderr is decoded with encoding (the caller's,
+    ///  kept alive until Run returns; nil leaves it to VSoft.Process) and handed to onLine in order, on the calling
+    ///  thread and never another. Each stream has its own line splitter, so an unfinished line on one is never joined
+    ///  to a line from the other. With onLine nil the output is not read.
+    ///  The wait goes through WaitForAnyHandle, so on the main thread of a UI host that installed ProcessMessagePump
+    ///  the host keeps running. cancellationToken and StartInfo.TimeoutInMSec stop the run - the whole process tree.
+    ///  Returns false when the process could not be started, with errorMessage saying why. Otherwise true, and
+    ///  process.Status, ExitCode and TimedOut say how the run ended. If onLine raises, the run is stopped and waited
+    ///  for, then the exception is raised again. </summary>
+    class function Run(const process : IProcess; const cancellationToken : ICancellationToken;
+                       const onLine : TProcessOutputLineProc; const encoding : TEncoding;
+                       out errorMessage : string) : boolean;
+  end;
+
 var
   //Optional hook installed by a UI host (the IDE) so TProcess can keep the host's message
   //loop alive while it is blocked waiting for a child process to exit (e.g. a multi-second
@@ -94,7 +118,7 @@ uses
   WinApi.Windows,
   WinApi.ShellAPI,
   Winapi.TlHelp32,
-  System.SysUtils;
+  System.SyncObjs;
 
 //The job object API - declared here because XE2's Winapi.Windows doesn't have it.
 const
@@ -309,6 +333,179 @@ begin
       exit;
     end;
   end;
+end;
+
+const
+  //how long to wait for a stopped run to complete. Its process tree is killed, so this is only reached if something is
+  //badly wrong.
+  cRunStopWaitMs = 5 * 60 * 1000;
+
+type
+  //The lines a run's pipe targets have read, waiting for Run to hand them to onLine on its own thread. Reference
+  //counted, so a target still held by the process can never reach a freed queue.
+  ILineQueue = interface
+    ['{DED72CBF-4632-4E95-8E63-531A0C10AEAC}']
+    //called on the threads VSoft.Process calls the pipe targets on.
+    procedure Add(const line : string);
+    //moves every queued line, in order, into lines.
+    procedure TakeAll(const lines : TStrings);
+    //signalled when a line has been added - auto reset.
+    function Handle : THandle;
+  end;
+
+  TLineQueue = class(TInterfacedObject, ILineQueue)
+  private
+    FLock : TCriticalSection;
+    FLines : TStringList;
+    FLinesQueued : TEvent;
+  protected
+    procedure Add(const line : string);
+    procedure TakeAll(const lines : TStrings);
+    function Handle : THandle;
+  public
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+constructor TLineQueue.Create;
+begin
+  inherited Create;
+  FLock := TCriticalSection.Create;
+  FLines := TStringList.Create;
+  //auto reset - each wake takes everything queued so far.
+  FLinesQueued := TEvent.Create(nil, false, false, '');
+end;
+
+destructor TLineQueue.Destroy;
+begin
+  FLinesQueued.Free;
+  FLines.Free;
+  FLock.Free;
+  inherited;
+end;
+
+procedure TLineQueue.Add(const line : string);
+begin
+  FLock.Enter;
+  try
+    FLines.Add(line);
+  finally
+    FLock.Leave;
+  end;
+  FLinesQueued.SetEvent;
+end;
+
+procedure TLineQueue.TakeAll(const lines : TStrings);
+begin
+  lines.Clear;
+  FLock.Enter;
+  try
+    lines.AddStrings(FLines);
+    FLines.Clear;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TLineQueue.Handle : THandle;
+begin
+  result := FLinesQueued.Handle;
+end;
+
+//A line target for one stream - each stream gets its own.
+function LineTarget(const queue : ILineQueue; const encoding : TEncoding) : IPipeTarget;
+var
+  target : ILineQueue;
+begin
+  target := queue;
+  result := TPipeTarget.ToLineDelegate(
+    procedure(const line : string)
+    begin
+      target.Add(line);
+    end, encoding);
+end;
+
+//Hands every queued line to onLine, in order.
+procedure Deliver(const queue : ILineQueue; const lines : TStrings; const onLine : TProcessOutputLineProc);
+var
+  i : integer;
+begin
+  queue.TakeAll(lines);
+  for i := 0 to lines.Count - 1 do
+    onLine(lines[i]);
+  lines.Clear;
+end;
+
+//Stops the run and waits for it to complete - so nothing is left running, or holding files open, when Run raises.
+procedure StopAndWait(const process : IProcess);
+begin
+  process.Terminate;
+  WaitForAnyHandle([process.CompletionHandle], cRunStopWaitMs);
+end;
+
+{ TProcessRunner }
+
+class function TProcessRunner.Run(const process : IProcess; const cancellationToken : ICancellationToken;
+                                  const onLine : TProcessOutputLineProc; const encoding : TEncoding;
+                                  out errorMessage : string) : boolean;
+var
+  queue : ILineQueue;
+  lines : TStringList;
+  waitResult : Cardinal;
+  done : boolean;
+begin
+  result := false;
+  errorMessage := '';
+  queue := nil;
+  if Assigned(onLine) then
+  begin
+    queue := TLineQueue.Create;
+    process.WithStdOutPipe(LineTarget(queue, encoding));
+    process.WithStdErrPipe(LineTarget(queue, encoding));
+  end;
+
+  //validation failed, the OS refused, or the token was already cancelled.
+  if not process.ExecuteAsync(cancellationToken) then
+  begin
+    errorMessage := Trim(process.Errors.Text);
+    if errorMessage = '' then
+      errorMessage := 'The process could not be started.';
+    exit;
+  end;
+
+  lines := TStringList.Create;
+  try
+    try
+      done := false;
+      while not done do
+      begin
+        if queue <> nil then
+          waitResult := WaitForAnyHandle([process.CompletionHandle, queue.Handle], INFINITE)
+        else
+          waitResult := WaitForAnyHandle([process.CompletionHandle], INFINITE);
+        case waitResult of
+          WAIT_OBJECT_0 :
+            begin
+              //completed - every target's Done has been called, so every line is queued by now.
+              if queue <> nil then
+                Deliver(queue, lines, onLine);
+              done := true;
+            end;
+          WAIT_OBJECT_0 + 1 :
+            Deliver(queue, lines, onLine);
+        else
+          raise EOSError.CreateFmt('Unexpected result %d waiting for [%s] : %s',
+                                   [waitResult, process.StartInfo.Executable, SysErrorMessage(GetLastError)]);
+        end;
+      end;
+    except
+      StopAndWait(process);
+      raise;
+    end;
+  finally
+    lines.Free;
+  end;
+  result := true;
 end;
 
 //A program that can't be started has no exit code to return.
