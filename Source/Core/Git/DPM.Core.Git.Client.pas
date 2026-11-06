@@ -34,6 +34,7 @@ uses
   Spring.Collections,
   DPM.Core.Logging,
   DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Git.Interfaces;
 
 type
@@ -77,7 +78,7 @@ type
     //password, the credential manager's window, ssh asking about a host key or a passphrase - would wait until the
     //timeout. ssh runs in batch mode unless the user has said which ssh to use (GIT_SSH_COMMAND, GIT_SSH, or
     //core.sshCommand - sshConfigured) : GIT_SSH_COMMAND would win over theirs.
-    class procedure MakeNonInteractive(const env : IEnvironmentBlock; const sshConfigured : boolean); static;
+    class procedure MakeNonInteractive(const env : IEnvironmentBuilder; const sshConfigured : boolean); static;
     //How long a command may run before it is stopped - git waiting on a network that has gone, say.
     class property TimeoutSeconds : integer read FTimeoutSeconds write FTimeoutSeconds;
 
@@ -94,9 +95,7 @@ uses
   WinApi.Windows,
   System.SysUtils,
   System.SyncObjs,
-  System.IOUtils,
   System.StrUtils,
-  System.Diagnostics,
   DPM.Core.Utils.Strings;
 
 const
@@ -198,28 +197,37 @@ begin
   end;
 end;
 
-class procedure TGitClient.MakeNonInteractive(const env : IEnvironmentBlock; const sshConfigured : boolean);
+class procedure TGitClient.MakeNonInteractive(const env : IEnvironmentBuilder; const sshConfigured : boolean);
+var
+  value : string;
 begin
   env.AddOrSet('GIT_TERMINAL_PROMPT', '0');
   env.AddOrSet('GCM_INTERACTIVE', 'never');
-  if sshConfigured or (env.GetValue('GIT_SSH_COMMAND') <> '') or (env.GetValue('GIT_SSH') <> '') then
+  if sshConfigured then
+    exit;
+  if env.TryGetValue('GIT_SSH_COMMAND', value) and (value <> '') then
+    exit;
+  if env.TryGetValue('GIT_SSH', value) and (value <> '') then
     exit;
   env.AddOrSet('GIT_SSH_COMMAND', 'ssh -oBatchMode=yes');
 end;
 
 class function TGitClient.SshCommandConfigured(const exeFile : string) : boolean;
+var
+  process : IProcess;
+  errorMessage : string;
 begin
   GitExeLock.Enter;
   try
     if not SshConfigResolved then
     begin
       //exits 1 when it isn't set. Its own token - a cancelled operation mustn't leave the answer 'no'.
-      try
-        SshConfigured := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, exeFile, 'config --get core.sshCommand', '', nil, 30 * 1000) = 0;
-      except
-        on e : EOSError do
-          SshConfigured := false;
-      end;
+      process := TProcess.Create;
+      process.StartInfo.Executable := exeFile;
+      process.StartInfo.TimeoutInMSec := 30 * 1000;
+      process.CommandLine.Add('config --get core.sshCommand', TQuoted.qtNone);
+      SshConfigured := TProcessRunner.Run(process, TCancellationTokenSourceFactory.Create.Token, nil, nil, errorMessage) and
+                       (process.Status = TProcessStatus.Exited) and (process.ExitCode = 0);
       SshConfigResolved := true;
     end;
     result := SshConfigured;
@@ -230,11 +238,10 @@ end;
 
 function TGitClient.RunGit(const cancellationToken : ICancellationToken; const args : string; const workingDir : string; const output : TStrings) : Cardinal;
 var
-  tmpFile : string;
   exeFile : string;
-  env : IEnvironmentBlock;
-  stopwatch : TStopwatch;
-  timedOut : boolean;
+  process : IProcess;
+  lines : TStrings;
+  errorMessage : string;
 begin
   output.Clear;
   exeFile := GitExe;
@@ -244,49 +251,35 @@ begin
     result := ERROR_FILE_NOT_FOUND;
     exit;
   end;
-  //temp file in the environment TEMP/TMP folder - never the working dir.
-  tmpFile := TPath.GetTempFileName;
-  try
-    //git.exe by its full path, started directly with stdout and stderr going to tmpFile. Never through cmd.exe -
-    //cmd looks for 'git' in the current folder before PATH, and the working folder of a checkout is a
-    //repository someone else wrote, which could hold a git.cmd.
-    FLogger.Debug('[git] ' + exeFile + ' ' + args);
-    env := TEnvironmentBlockFactory.Create(nil, true);
-    MakeNonInteractive(env, SshCommandConfigured(exeFile));
-    try
-      stopwatch := TStopwatch.StartNew;
-      result := TProcess.Execute2(cancellationToken, exeFile, args, workingDir, env, FTimeoutSeconds * 1000, tmpFile);
-      //stopped - by the token, or because it ran out of time.
-      timedOut := (result <> 0) and (not cancellationToken.IsCancelled) and (stopwatch.ElapsedMilliseconds >= Int64(FTimeoutSeconds) * 1000);
-    except
-      //git couldn't be started - that is the output.
-      on e : EOSError do
-      begin
-        output.Add(e.Message);
-        result := e.ErrorCode;
-        exit;
-      end;
-    end;
-    if TFile.Exists(tmpFile) then
+  //git.exe by its full path, started directly with stdout and stderr read through pipes. Never through cmd.exe - cmd
+  //looks for 'git' in the current folder before PATH, and the working folder of a checkout is a repository someone
+  //else wrote, which could hold a git.cmd.
+  FLogger.Debug('[git] ' + exeFile + ' ' + args);
+  process := TProcess.Create;
+  process.StartInfo.Executable := exeFile;
+  process.StartInfo.WorkingDirectory := workingDir;
+  process.StartInfo.TimeoutInMSec := Cardinal(FTimeoutSeconds) * 1000;
+  process.CommandLine.Add(args, TQuoted.qtNone);
+  MakeNonInteractive(process.Environment, SshCommandConfigured(exeFile));
+  lines := output;
+  //git writes UTF-8 - tag and branch names may not be ASCII.
+  if not TProcessRunner.Run(process, cancellationToken,
+    procedure(const line : string)
     begin
-      try
-        output.LoadFromFile(tmpFile);
-      except
-        //ignore - output is best effort for diagnostics/parsing.
-      end;
-    end;
-    if timedOut then
-      output.Insert(0, 'git did not finish within ' + IntToStr(FTimeoutSeconds) + ' seconds - it was stopped.');
-  finally
-    if TFile.Exists(tmpFile) then
-    begin
-      try
-        TFile.Delete(tmpFile);
-      except
-        //ignore
-      end;
-    end;
+      lines.Add(line);
+    end, TEncoding.UTF8, errorMessage) then
+  begin
+    //git couldn't be started - that is the output. Never 0 : a validation failure (a missing working folder) has no
+    //OS error.
+    output.Add(errorMessage);
+    result := process.LastError;
+    if result = 0 then
+      result := 1;
+    exit;
   end;
+  result := process.ExitCode;
+  if process.TimedOut then
+    output.Insert(0, 'git did not finish within ' + IntToStr(FTimeoutSeconds) + ' seconds - it was stopped.');
 end;
 
 class function TGitClient.ParseTags(const lines : TStrings) : IDictionary<string, string>;

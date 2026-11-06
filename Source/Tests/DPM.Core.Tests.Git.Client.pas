@@ -56,6 +56,9 @@ type
     procedure NonInteractive_Keeps_The_Users_Git_Ssh;
     [Test]
     procedure NonInteractive_Keeps_The_Configured_Ssh_Command;
+    //an empty GIT_SSH_COMMAND says nothing about which ssh to use.
+    [Test]
+    procedure NonInteractive_Runs_Ssh_In_Batch_Mode_When_The_Ssh_Command_Is_Empty;
     //what the commands git starts actually see.
     [Test]
     procedure Git_Commands_Run_Without_Prompts;
@@ -112,7 +115,7 @@ uses
   Spring.Collections,
   VSoft.CancellationToken,
   DPM.Core.Logging,
-  DPM.Core.Utils.Process,
+  VSoft.Process,
   DPM.Core.Git.Interfaces,
   DPM.Core.Git.Client,
   TestLogger;
@@ -283,10 +286,14 @@ end;
 //runs git directly, to set up a repository - fails the test if git does.
 procedure RunGitForSetup(const args : string; const workingDir : string);
 var
-  exitCode : Cardinal;
+  process : IProcess;
 begin
-  exitCode := TProcess.Execute2(TCancellationTokenSourceFactory.Create.Token, TGitClient.GitExe, args, workingDir);
-  Assert.IsTrue(exitCode = 0, 'git ' + args + ' exited with ' + IntToStr(exitCode));
+  process := TProcess.Create;
+  process.StartInfo.Executable := TGitClient.GitExe;
+  process.StartInfo.WorkingDirectory := workingDir;
+  process.CommandLine.Add(args, TQuoted.qtNone);
+  Assert.IsTrue(process.Execute, 'git ' + args + ' did not start : ' + process.Errors.Text);
+  Assert.IsTrue(process.ExitCode = 0, 'git ' + args + ' exited with ' + IntToStr(process.ExitCode));
 end;
 
 procedure TGitClientTests.LsRemoteTags_Reads_The_Tags_Of_A_Local_Repository;
@@ -338,56 +345,83 @@ begin
   Assert.AreEqual('', url);
 end;
 
+//An environment with nothing in it. The shell running the tests may set GIT_TERMINAL_PROMPT and GCM_INTERACTIVE
+//itself, and a test must only see what MakeNonInteractive sets.
+function EmptyEnvironment : IEnvironmentBuilder;
+var
+  process : IProcess;
+begin
+  process := TProcess.Create;
+  result := process.Environment;
+  result.Clear;
+end;
+
+function ValueOf(const env : IEnvironmentBuilder; const name : string) : string;
+begin
+  if not env.TryGetValue(name, result) then
+    result := '';
+end;
+
 procedure TGitClientTests.NonInteractive_Turns_Off_Git_And_Credential_Manager_Prompts;
 var
-  env : IEnvironmentBlock;
+  env : IEnvironmentBuilder;
 begin
-  env := TEnvironmentBlockFactory.Create(nil, false);
+  env := EmptyEnvironment;
   //whatever the user's own environment says.
   env.AddOrSet('GIT_TERMINAL_PROMPT', '1');
   TGitClient.MakeNonInteractive(env, false);
-  Assert.AreEqual('0', env.GetValue('GIT_TERMINAL_PROMPT'));
-  Assert.AreEqual('never', env.GetValue('GCM_INTERACTIVE'));
+  Assert.AreEqual('0', ValueOf(env, 'GIT_TERMINAL_PROMPT'));
+  Assert.AreEqual('never', ValueOf(env, 'GCM_INTERACTIVE'), false);
 end;
 
 procedure TGitClientTests.NonInteractive_Runs_Ssh_In_Batch_Mode;
 var
-  env : IEnvironmentBlock;
+  env : IEnvironmentBuilder;
 begin
-  env := TEnvironmentBlockFactory.Create(nil, false);
+  env := EmptyEnvironment;
   TGitClient.MakeNonInteractive(env, false);
-  Assert.AreEqual('ssh -oBatchMode=yes', env.GetValue('GIT_SSH_COMMAND'));
+  Assert.AreEqual('ssh -oBatchMode=yes', ValueOf(env, 'GIT_SSH_COMMAND'), false);
 end;
 
 procedure TGitClientTests.NonInteractive_Keeps_The_Users_Ssh_Command;
 var
-  env : IEnvironmentBlock;
+  env : IEnvironmentBuilder;
 begin
-  env := TEnvironmentBlockFactory.Create(nil, false);
+  env := EmptyEnvironment;
   env.AddOrSet('GIT_SSH_COMMAND', 'C:/Windows/System32/OpenSSH/ssh.exe');
   TGitClient.MakeNonInteractive(env, false);
-  Assert.AreEqual('C:/Windows/System32/OpenSSH/ssh.exe', env.GetValue('GIT_SSH_COMMAND'));
+  Assert.AreEqual('C:/Windows/System32/OpenSSH/ssh.exe', ValueOf(env, 'GIT_SSH_COMMAND'), false);
 end;
 
 procedure TGitClientTests.NonInteractive_Keeps_The_Users_Git_Ssh;
 var
-  env : IEnvironmentBlock;
+  env : IEnvironmentBuilder;
 begin
-  env := TEnvironmentBlockFactory.Create(nil, false);
+  env := EmptyEnvironment;
   env.AddOrSet('GIT_SSH', 'C:\Program Files\PuTTY\plink.exe');
   TGitClient.MakeNonInteractive(env, false);
-  Assert.AreEqual('', env.GetValue('GIT_SSH_COMMAND'));
-  Assert.AreEqual('C:\Program Files\PuTTY\plink.exe', env.GetValue('GIT_SSH'));
+  Assert.IsFalse(env.Exists('GIT_SSH_COMMAND'), 'GIT_SSH_COMMAND would win over the user''s GIT_SSH');
+  Assert.AreEqual('C:\Program Files\PuTTY\plink.exe', ValueOf(env, 'GIT_SSH'), false);
 end;
 
 procedure TGitClientTests.NonInteractive_Keeps_The_Configured_Ssh_Command;
 var
-  env : IEnvironmentBlock;
+  env : IEnvironmentBuilder;
 begin
-  env := TEnvironmentBlockFactory.Create(nil, false);
+  env := EmptyEnvironment;
   //core.sshCommand is set.
   TGitClient.MakeNonInteractive(env, true);
-  Assert.AreEqual('', env.GetValue('GIT_SSH_COMMAND'));
+  Assert.IsFalse(env.Exists('GIT_SSH_COMMAND'), 'GIT_SSH_COMMAND would win over core.sshCommand');
+end;
+
+procedure TGitClientTests.NonInteractive_Runs_Ssh_In_Batch_Mode_When_The_Ssh_Command_Is_Empty;
+var
+  env : IEnvironmentBuilder;
+begin
+  env := EmptyEnvironment;
+  env.AddOrSet('GIT_SSH_COMMAND', '');
+  TGitClient.MakeNonInteractive(env, false);
+  Assert.AreEqual('ssh -oBatchMode=yes', ValueOf(env, 'GIT_SSH_COMMAND'), false);
 end;
 
 //A repository whose origin is an ext:: url - fetching from it runs the command, through sh, and what the command
