@@ -60,6 +60,10 @@ type
   TVersionGridRow = class
     ProjectName : string;
     InstalledVersion : TPackageVersion;
+    //the project has the package only as a dependency of another package, at InstalledVersion. Its version can be
+    //changed (in place - an upgrade), or it can be installed (made a top level reference). It isn't uninstalled here,
+    //and it doesn't count as installed.
+    IsTransitive : boolean;
     //IDE session-only 'use source' state for this package in this project. HasSource gates whether
     //the 'Use Source' menu item is enabled (the package must actually ship source); UseSource is the
     //current choice. Read by the host to build the row's '...' popup menu.
@@ -138,6 +142,8 @@ type
     procedure SetProjectHasSource(index: integer; const Value: boolean);
     function GetProjectUseSource(index: integer): boolean;
     procedure SetProjectUseSource(index: integer; const Value: boolean);
+    function GetProjectIsTransitive(index: integer): boolean;
+    procedure SetProjectIsTransitive(index: integer; const Value: boolean);
 
     function GetTotalColumnWidth : integer;
 
@@ -225,18 +231,24 @@ type
     procedure ChangeScale(M, D: Integer{$IF CompilerVersion > 33}; isDpiChange: Boolean{$IFEND} ); override;
     procedure Clear;
     procedure AddProject(const project : string; const version : string);
+    //the projects with the package as a top level reference - not those that only have it as a dependency.
     function GetInstalledProjects : TArray<string>;
+    //the projects that don't have the package as a top level reference - those that only have it as a dependency
+    //too (an install makes it a top level reference there).
     function GetNotInstalledProjects : TArray<string>;
     function GetAllProjects : TArray<string>;
     property CurrentRow : Integer read FCurrentRow;
     property TopRow : Integer read FTopRow;
 
+    //any project with the package as a top level reference.
     property HasAnyInstalled : boolean read GetHasAnyInstalled;
     property ImageList : TCustomImageList read FImageList write SetImageList;
     property ProjectName[index : integer] : string read GetProjectName;
     property ProjectVersion[index : integer] : TPackageVersion read GetProjectVersion write SetProjectVersion;
     property ProjectHasSource[index : integer] : boolean read GetProjectHasSource write SetProjectHasSource;
     property ProjectUseSource[index : integer] : boolean read GetProjectUseSource write SetProjectUseSource;
+    //the project has the package only as a dependency - see TVersionGridRow.IsTransitive.
+    property ProjectIsTransitive[index : integer] : boolean read GetProjectIsTransitive write SetProjectIsTransitive;
 
     property PackageVersion : TPackageVersion read FPackageVersion write SetPackageVersion;
     property RowCount : integer read GetRowCount;
@@ -374,7 +386,8 @@ end;
 
 const
   cDefaultColumnWidth = 32;
-  cInstalledColumnWidth = 120;
+  //room for a dependency's '1.0.0-beta.1 (transitive)'.
+  cInstalledColumnWidth = 150;
   cMenuButtonText = '...';
 
 
@@ -968,11 +981,15 @@ begin
       1 : //installed version
       begin
         if not project.InstalledVersion.IsEmpty then
+        begin
           txt := project.InstalledVersion.ToStringNoMeta;
+          if project.IsTransitive then
+            txt := txt + ' (transitive)';
+        end;
       end;
-      2 : //add
+      2 : //add - a dependency too, which makes it a top level reference.
       begin
-        if project.InstalledVersion.IsEmpty then
+        if project.InstalledVersion.IsEmpty or project.IsTransitive then
         begin
           DrawButton;
           FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 0,  TDrawingStyle.dsTransparent, TImageType.itImage, true );
@@ -995,9 +1012,9 @@ begin
             FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 3, TDrawingStyle.dsTransparent, TImageType.itImage, true );
         end;
       end;
-      4 : //remove
+      4 : //remove - not a dependency, the package that depends on it needs it.
       begin
-        if not project.InstalledVersion.IsEmpty then
+        if (not project.InstalledVersion.IsEmpty) and (not project.IsTransitive) then
         begin
           DrawButton;
           FImageList.Draw(LCanvas, imgRect.Left, imgRect.Top, 1, TDrawingStyle.dsTransparent, TImageType.itImage, true );
@@ -1014,7 +1031,7 @@ begin
       end;
     end;
     if txt <> '' then
-      DrawText(LCanvas.Handle, PChar(txt),Length(txt), colRect, DT_SINGLELINE + DT_LEFT + DT_VCENTER );
+      DrawText(LCanvas.Handle, PChar(txt),Length(txt), colRect, DT_SINGLELINE + DT_LEFT + DT_VCENTER + DT_END_ELLIPSIS);
 
   end;
   destRect := rowRect;
@@ -1078,7 +1095,7 @@ begin
       end;
       htRowInstall:
       begin
-        result := row.InstalledVersion.IsEmpty;
+        result := row.InstalledVersion.IsEmpty or row.IsTransitive;
       end;
       htRowUpDn:
       begin
@@ -1092,7 +1109,7 @@ begin
       end;
       htRowRemove:
       begin
-        result := not row.InstalledVersion.IsEmpty;
+        result := (not row.InstalledVersion.IsEmpty) and (not row.IsTransitive);
       end;
     end;
   end;
@@ -1105,7 +1122,7 @@ begin
   result := false;
   for i := 0 to FRows.Count -1 do
   begin
-    if not FRows[i].InstalledVersion.IsEmpty then
+    if (not FRows[i].InstalledVersion.IsEmpty) and (not FRows[i].IsTransitive) then
       exit(true);
   end;
 end;
@@ -1121,7 +1138,7 @@ begin
   try
     for i := 0 to FRows.Count -1 do
     begin
-      if FRows[i].InstalledVersion.IsEmpty then
+      if FRows[i].InstalledVersion.IsEmpty or FRows[i].IsTransitive then
         list.Add(FRows[i].ProjectName);
     end;
   finally
@@ -1141,7 +1158,7 @@ begin
   try
     for i := 0 to FRows.Count -1 do
     begin
-      if not FRows[i].InstalledVersion.IsEmpty then
+      if (not FRows[i].InstalledVersion.IsEmpty) and (not FRows[i].IsTransitive) then
         list.Add(FRows[i].ProjectName);
     end;
   finally
@@ -1712,6 +1729,19 @@ procedure TVersionGrid.SetProjectUseSource(index: integer; const Value: boolean)
 begin
   if (index >= 0) and (index < FRows.Count) then
     FRows[index].UseSource := value;
+end;
+
+function TVersionGrid.GetProjectIsTransitive(index: integer): boolean;
+begin
+  result := false;
+  if (index >= 0) and (index < FRows.Count) then
+    result := FRows[index].IsTransitive;
+end;
+
+procedure TVersionGrid.SetProjectIsTransitive(index: integer; const Value: boolean);
+begin
+  if (index >= 0) and (index < FRows.Count) then
+    FRows[index].IsTransitive := value;
 end;
 
 procedure TVersionGrid.SetRowHeight(const Value: integer);

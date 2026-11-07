@@ -169,6 +169,8 @@ type
 
     procedure ProjectSelectionChanged(Sender : TObject);
     procedure UpdateButtonState;
+    function GetUpgradeAllDirection : integer;
+    function GetRowsShowPackage : boolean;
     procedure SetPackageLogo(const id : string);
 
     function GetReferenceVersion : TPackageVersion;
@@ -943,6 +945,8 @@ var
   packageRefs : IPackageReference;
   projectRefs : IPackageReference;
   projectRef : IPackageReference;
+  dependencyRefs : IList<IPackageReference>;
+  isTransitive : boolean;
 begin
   //remember which package the grid rows now represent - see FProjectsGridPackageId.
   FProjectsGridPackageId := packageId;
@@ -955,15 +959,30 @@ begin
     FProjectsGrid.PackageVersion := FSelectedVersion;
     for i := 0 to FProjectsGrid.RowCount -1 do
     begin
+      projectRef := nil;
+      isTransitive := false;
       if packageRefs <> nil then
       begin
-        projectRef := nil;
         //by the row's project - the group's projects needn't be the rows, a row at a time (one is closing, say).
         projectRefs := packageRefs.FindTopLevelChild(LowerCase(FProjectsGrid.ProjectName[i]));
         if projectRefs <> nil then
+        begin
           projectRef := projectRefs.FindTopLevelChild(LowerCase(packageId));
+          //only a dependency of another package here - shown at the version the project has, which an upgrade
+          //changes in place. A project has one version of a package, whichever package depends on it.
+          if projectRef = nil then
+          begin
+            dependencyRefs := projectRefs.FindChildren(packageId);
+            if dependencyRefs.Any then
+            begin
+              projectRef := dependencyRefs.First;
+              isTransitive := true;
+            end;
+          end;
+        end;
       end;
 
+      FProjectsGrid.ProjectIsTransitive[i] := isTransitive;
       if projectRef <> nil then
       begin
         FProjectsGrid.ProjectVersion[i] := projectRef.Version;
@@ -982,6 +1001,8 @@ begin
   finally
     FProjectsGrid.EndUpdate;
   end;
+  //Install All / Upgrade All follow what the projects have.
+  UpdateButtonState;
 end;
 
 function TPackageDetailsFrame.GetPackageMetaDataAsync(const id: string; const version: string; const compilerVersion: TCompilerVersion): IAwaitable<IPackageSearchResultItem>;
@@ -1294,7 +1315,10 @@ begin
     try
       FProjectsGrid.Enabled := false;
       for i := 0 to FProjectsGrid.RowCount  -1 do
+      begin
         FProjectsGrid.ProjectVersion[i] := TPackageVersion.Empty;
+        FProjectsGrid.ProjectIsTransitive[i] := false;
+      end;
       FProjectsGrid.PackageVersion := TPackageVersion.Empty;
     finally
       FProjectsGrid.EndUpdate;
@@ -1409,10 +1433,57 @@ begin
   result := FVersionsCache.TryGetValue(LowerCase(id + '-' + BoolToStr(includePrerelease,true)), versions);
 end;
 
+//True when the grid rows show the package that is shown - they are refreshed after a delay (see DebounceTimerTimer),
+//so until then they still show the last one.
+function TPackageDetailsFrame.GetRowsShowPackage : boolean;
+begin
+  result := (FPackageMetaData <> nil) and SameText(FProjectsGridPackageId, FPackageMetaData.Id);
+end;
+
+//Which way Upgrade All would move the projects to the selected version : 1 when a project is below it (an upgrade),
+//-1 when the projects not at it are all above it (a downgrade), 0 when every project that has the package is at it.
+//A project counts whether the package is a top level reference or only a dependency there - an upgrade changes a
+//dependency in place - so a group with one project behind is offered the upgrade even when the version shown (the
+//first top level found) is already the selected one.
+function TPackageDetailsFrame.GetUpgradeAllDirection : integer;
+var
+  i : integer;
+  projectVersion : TPackageVersion;
+begin
+  result := 0;
+  if (FPackageMetaData = nil) or FSelectedVersion.IsEmpty then
+    exit;
+
+  if not GetRowsShowPackage then
+  begin
+    if FInstalledVersion.IsEmpty or (FSelectedVersion = FInstalledVersion) then
+      exit;
+    if FSelectedVersion > FInstalledVersion then
+      result := 1
+    else
+      result := -1;
+    exit;
+  end;
+
+  for i := 0 to FProjectsGrid.RowCount - 1 do
+  begin
+    projectVersion := FProjectsGrid.ProjectVersion[i];
+    if projectVersion.IsEmpty or (projectVersion = FSelectedVersion) then
+      continue;
+    if projectVersion < FSelectedVersion then
+    begin
+      result := 1;
+      exit;
+    end;
+    result := -1;
+  end;
+end;
+
 procedure TPackageDetailsFrame.UpdateButtonState;
 var
   referenceVersion : TPackageVersion;
   isTransitive : boolean;
+  upgradeDirection : integer;
 begin
   if FPackageMetaData = nil then
   begin
@@ -1437,8 +1508,14 @@ begin
   //broken and the transitive would be re-added on the next restore. Upgrades are still allowed -
   //if the new version is outside the parent's allowed range the resolver will surface that.
   isTransitive := FPackageMetaData.IsTransitive;
-  btnInstallAll.Enabled := FPackageMetaData <> nil;
-  btnUpgradeAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty) and (FSelectedVersion <> FInstalledVersion);
+  //Install All adds the package as a top level reference where a project doesn't have it as one - including where
+  //it is only a dependency.
+  if GetRowsShowPackage then
+    btnInstallAll.Enabled := Length(FProjectsGrid.GetNotInstalledProjects) > 0
+  else
+    btnInstallAll.Enabled := true;
+  upgradeDirection := GetUpgradeAllDirection;
+  btnUpgradeAll.Enabled := upgradeDirection <> 0;
   btnUninstallAll.Enabled := (FPackageMetaData <> nil) and (FInstalledVersion <> TPackageVersion.Empty) and (not isTransitive);
 
   if isTransitive then
@@ -1447,11 +1524,11 @@ begin
     btnUninstallAll.Hint := 'Uninstall from all projects';
 
   {$IFNDEF USEIMAGECOLLECTION}
-    if FSelectedVersion = FInstalledVersion then
+    if upgradeDirection = 0 then
     begin
       btnUpgradeAll.Glyph.Assign(nil);
     end
-    else  if FSelectedVersion > FInstalledVersion then
+    else  if upgradeDirection > 0 then
     begin
       btnUpgradeAll.Glyph.Assign(FUpgradeBmp);
       btnUpgradeAll.Hint := 'Upgrade package in all projects';
@@ -1462,11 +1539,11 @@ begin
       btnUpgradeAll.Hint := 'Downgrade package in all projects';
     end;
   {$ELSE}
-    if FSelectedVersion = FInstalledVersion then
+    if upgradeDirection = 0 then
     begin
       btnUpgradeAll.ImageIndex := -1;
     end
-    else if FSelectedVersion > FInstalledVersion then
+    else if upgradeDirection > 0 then
     begin
       btnUpgradeAll.ImageIndex := 2;
       btnUpgradeAll.Hint := 'Upgrade package in all projects';

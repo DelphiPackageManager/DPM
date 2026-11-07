@@ -1390,13 +1390,13 @@ begin
 
   //Product metadata. Each one overrides the same key in <project>.sbom.yaml next to the project,
   //which is where values that should apply on every run (and in the IDE) belong.
-  cmd.RegisterOption<string>('version', '', 'Product version for the SBOM root. Default: the sidecar, else ProductVersion (or FileVersion) from the project version info.',
+  cmd.RegisterOption<string>('version', '', 'Product version for the SBOM root. Default: version in <project>.sbom.yaml, else ProductVersion (or FileVersion) from the project version info.',
     procedure(const value : string)
     begin
       TSBOMOptions.Default.ProductVersion := value;
     end);
 
-  cmd.RegisterOption<string>('supplier', '', 'Name of the product''s supplier. Default: the sidecar, else CompanyName from the project version info.',
+  cmd.RegisterOption<string>('supplier', '', 'Name of the product''s supplier. Default: supplier in <project>.sbom.yaml, else CompanyName from the project version info.',
     procedure(const value : string)
     begin
       TSBOMOptions.Default.Supplier := value;
