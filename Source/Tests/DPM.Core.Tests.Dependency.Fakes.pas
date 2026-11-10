@@ -56,7 +56,7 @@ type
     function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean; const sources : string = '') : IList<TPackageVersion>;
     function GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; const sources : string = '') : IPackageSearchResultItem;
     function GetPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const compilerVersion : TCompilerVersion) : IPackageSearchResult;
-    function GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
+    function GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; out noIcon : boolean) : IPackageIcon;
     function GetInstalledPackageFeed(const cancellationToken : ICancellationToken; const options : TSearchOptions; const installedPackages : IList<IPackageIdentity>) : IList<IPackageSearchResultItem>;
   public
     constructor Create;
@@ -107,6 +107,9 @@ type
                                                       const versionRange : TVersionRange;
                                                       const preRelease : boolean) : IList<IPackageInfo>;
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    procedure SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon);
+    procedure SavePackageIconMissing(const packageId : IPackageIdentity);
+    function IsPackageIconMissing(const packageId : IPackageIdentity) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
     function FullReVerify(const cancellationToken : ICancellationToken) : integer;
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
@@ -413,7 +416,7 @@ begin
   raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageFeed');
 end;
 
-function TFakeRepositoryManager.GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
+function TFakeRepositoryManager.GetPackageIcon(const cancellationToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; out noIcon : boolean) : IPackageIcon;
 begin
   raise ENotImplemented.Create('TFakeRepositoryManager.GetPackageIcon');
 end;
@@ -570,6 +573,19 @@ end;
 function TFakePackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 begin
   icon := nil;
+  result := false;
+end;
+
+procedure TFakePackageCache.SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon);
+begin
+end;
+
+procedure TFakePackageCache.SavePackageIconMissing(const packageId : IPackageIdentity);
+begin
+end;
+
+function TFakePackageCache.IsPackageIconMissing(const packageId : IPackageIdentity) : boolean;
+begin
   result := false;
 end;
 

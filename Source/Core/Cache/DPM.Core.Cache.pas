@@ -104,6 +104,10 @@ type
     function ReadInstalledSpec(const packageId : IPackageIdentity) : IPackageSpec;
     //EnsurePackage's work once the package's lock is held.
     function CheckAndRepairPackage(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : boolean;
+    //where SavePackageIcon / SavePackageIconMissing keep what they record for a version - beside the package files,
+    //{cache}\{compiler}\{id}\{version}{ext}, ext one of the cSavedIcon* extensions.
+    function GetSavedIconPath(const packageId : IPackageIdentity; const ext : string) : string;
+    procedure DeleteSavedIcons(const packageId : IPackageIdentity);
   protected
     procedure SetLocation(const value : string);
     function GetLocation : string;
@@ -139,6 +143,9 @@ type
     function GetPackageHash(const packageId : IPackageIdentity) : string;
 
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    procedure SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon);
+    procedure SavePackageIconMissing(const packageId : IPackageIdentity);
+    function IsPackageIconMissing(const packageId : IPackageIdentity) : boolean;
 
 //    function InstallPackage(const packageId : IPackageIdentity; const saveFile : boolean; const source : string = '') : boolean;
 
@@ -187,6 +194,11 @@ uses
 
 const
   cPackageLockWaitMs = 5 * 60 * 1000;
+  //an icon downloaded for a version that isn't installed, kept beside its .dpkg files - see SavePackageIcon.
+  cSavedIconSvgExt = '.icon.svg';
+  cSavedIconPngExt = '.icon.png';
+  //the version's source said it has no icon - see SavePackageIconMissing.
+  cSavedIconMissingExt = '.icon.none';
 
 //A package id is a folder name in the cache, and it comes from wherever the package did - a feed's json,
 //a package's own spec. Anything but a package id's shape - words separated by dots, so never a separator,
@@ -1168,6 +1180,9 @@ begin
       end;
     end;
 
+    // the icon downloaded for the version, or the record that it has none, goes with it.
+    DeleteSavedIcons(packageId);
+
     // tidy up the now-empty id folder so the cache doesn't accumulate stubs.
     try
       if Length(TDirectory.GetFileSystemEntries(packageFileFolder)) = 0 then
@@ -1547,34 +1562,146 @@ begin
   end;
 end;
 
+//The icon in svgPath, else the one in pngPath - nil when neither file is there. The icon owns the stream.
+function ReadIconFiles(const svgPath : string; const pngPath : string) : IPackageIcon;
+begin
+  result := nil;
+  if FileExists(svgPath) then
+    result := CreatePackageIcon(TPackageIconKind.ikSvg, ReadFileToStream(svgPath))
+  else if FileExists(pngPath) then
+    result := CreatePackageIcon(TPackageIconKind.ikPng, ReadFileToStream(pngPath));
+end;
+
+function TPackageCache.GetSavedIconPath(const packageId : IPackageIdentity; const ext : string) : string;
+begin
+  result := GetPackageFileFolder(packageId) + PathDelim + packageId.Version.ToStringNoMeta + ext;
+end;
+
 function TPackageCache.TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
 var
   packageFolder : string;
-  svgPath : string;
-  pngPath : string;
 begin
   result := false;
   icon := nil;
   if packageId = nil then
     exit;
-  packageFolder := GetPackagePath(packageId);
-  if not IsFinishedInstall(packageFolder) then
-    exit;
-  svgPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFileSVG;
-  pngPath := IncludeTrailingPathDelimiter(packageFolder) + cIconFilePNG;
-  //another process may be replacing the package as we read - then it is not cached for now.
+  //another process may be replacing the package as we read - then it is not cached for now. An id that can't
+  //name a cache folder has nothing cached either.
   try
-    //the icon owns the stream.
-    if FileExists(svgPath) then
-      icon := CreatePackageIcon(TPackageIconKind.ikSvg, ReadFileToStream(svgPath))
-    else if FileExists(pngPath) then
-      icon := CreatePackageIcon(TPackageIconKind.ikPng, ReadFileToStream(pngPath));
+    //the installed package's own icon first - it is the one the package shipped.
+    packageFolder := GetPackagePath(packageId);
+    if IsFinishedInstall(packageFolder) then
+      icon := ReadIconFiles(IncludeTrailingPathDelimiter(packageFolder) + cIconFileSVG,
+                            IncludeTrailingPathDelimiter(packageFolder) + cIconFilePNG);
+    //then one downloaded for the version earlier.
+    if icon = nil then
+      icon := ReadIconFiles(GetSavedIconPath(packageId, cSavedIconSvgExt), GetSavedIconPath(packageId, cSavedIconPngExt));
     result := icon <> nil;
   except
     on e : Exception do
     begin
       FLogger.Debug('[PackageCache] Unable to read the icon of [' + packageId.ToString + '] : ' + e.Message);
       icon := nil;
+    end;
+  end;
+end;
+
+procedure TPackageCache.SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon);
+var
+  ext : string;
+  iconFile : string;
+  missingFile : string;
+  bytes : TBytes;
+begin
+  if (packageId = nil) or (icon = nil) or (icon.Stream = nil) then
+    exit;
+  case icon.Kind of
+    TPackageIconKind.ikSvg : ext := cSavedIconSvgExt;
+    TPackageIconKind.ikPng : ext := cSavedIconPngExt;
+  else
+    exit;
+  end;
+  //Saving is a nicety - the icon has been downloaded and is shown either way. A cache we can't write to (read only,
+  //on a share) just means it is downloaded again next time.
+  try
+    iconFile := GetSavedIconPath(packageId, ext);
+    missingFile := GetSavedIconPath(packageId, cSavedIconMissingExt);
+    //the caller shows this same icon next, reading the stream from the start.
+    SetLength(bytes, icon.Stream.Size);
+    icon.Stream.Position := 0;
+    try
+      if Length(bytes) > 0 then
+        icon.Stream.ReadBuffer(bytes[0], Length(bytes));
+    finally
+      icon.Stream.Position := 0;
+    end;
+    if not ForceDirectories(ExtractFileDir(iconFile)) then
+      raise EInOutError.Create('Unable to create the folder [' + ExtractFileDir(iconFile) + ']');
+    TFileUtils.AtomicWriteAllBytes(iconFile, bytes);
+    if FileExists(missingFile) then
+      System.SysUtils.DeleteFile(missingFile);
+  except
+    on e : Exception do
+      FLogger.Debug('[PackageCache] Unable to save the icon of [' + packageId.ToString + '] : ' + e.Message);
+  end;
+end;
+
+procedure TPackageCache.SavePackageIconMissing(const packageId : IPackageIdentity);
+var
+  missingFile : string;
+begin
+  if packageId = nil then
+    exit;
+  //Best effort, like SavePackageIcon - not saving it only means the source is asked again.
+  try
+    missingFile := GetSavedIconPath(packageId, cSavedIconMissingExt);
+    if not ForceDirectories(ExtractFileDir(missingFile)) then
+      raise EInOutError.Create('Unable to create the folder [' + ExtractFileDir(missingFile) + ']');
+    //written again each time the source says so - the file's age is how long ago it last did.
+    TFileUtils.AtomicWriteAllText(missingFile, 'The source has no icon for this package version.', TEncoding.ASCII);
+  except
+    on e : Exception do
+      FLogger.Debug('[PackageCache] Unable to record that [' + packageId.ToString + '] has no icon : ' + e.Message);
+  end;
+end;
+
+function TPackageCache.IsPackageIconMissing(const packageId : IPackageIdentity) : boolean;
+var
+  missingFile : string;
+  recordedAt : TDateTime;
+begin
+  result := false;
+  if packageId = nil then
+    exit;
+  try
+    missingFile := GetSavedIconPath(packageId, cSavedIconMissingExt);
+    if not FileAge(missingFile, recordedAt) then
+      exit;
+    //a version's icon doesn't change once it is published - but a source can be put right, so ask again now and then.
+    result := DaysBetween(Now, recordedAt) < cIconMissingRetryDays;
+  except
+    on e : Exception do
+      FLogger.Debug('[PackageCache] Unable to check whether [' + packageId.ToString + '] has an icon : ' + e.Message);
+  end;
+end;
+
+procedure TPackageCache.DeleteSavedIcons(const packageId : IPackageIdentity);
+const
+  cSavedIconExts : array[0..2] of string = (cSavedIconSvgExt, cSavedIconPngExt, cSavedIconMissingExt);
+var
+  i : integer;
+  savedFile : string;
+begin
+  for i := Low(cSavedIconExts) to High(cSavedIconExts) do
+  begin
+    savedFile := GetSavedIconPath(packageId, cSavedIconExts[i]);
+    if not FileExists(savedFile) then
+      continue;
+    try
+      TFile.Delete(savedFile);
+    except
+      on e : Exception do
+        FLogger.Debug('[PackageCache] Unable to remove the saved icon [' + savedFile + '] : ' + e.Message);
     end;
   end;
 end;

@@ -100,7 +100,7 @@ type
     function TryGetSourceType(const sourceName : string; out sourceType : TSourceType) : boolean;
     function InstallPackageInPlace(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const targetDir : string) : boolean;
     function GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;
-    function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
+    function GetPackageIcon(const cancelToken : ICancellationToken; const source : string; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion; out noIcon : boolean) : IPackageIcon;
     function GetPackageVersions(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion; const packageId : string; const includePrerelease : boolean; const sources : string = '') : IList<TPackageVersion>; overload;
 
     function GetPackageVersionsWithDependencies(const cancellationToken : ICancellationToken; const compilerVersion : TCompilerVersion;
@@ -537,13 +537,14 @@ begin
 end;
 
 function TPackageRepositoryManager.GetPackageIcon(const cancelToken : ICancellationToken; const source, packageId, packageVersion : string;
-                                                  const compilerVersion : TCompilerVersion) : IPackageIcon;
+                                                  const compilerVersion : TCompilerVersion; out noIcon : boolean) : IPackageIcon;
 var
   repo : IPackageRepository;
 begin
   FLogger.Debug('TPackageRepositoryManager.GetPackageIcon');
   Assert(FConfiguration <> nil);
   result := nil;
+  noIcon := false;
 
   //Initialize reported why.
   if not UpdateRepositories then
@@ -560,8 +561,11 @@ begin
     exit;
 
   result := repo.GetPackageIcon(cancelToken, packageId, packageVersion, compilerVersion);
-
-
+  //the source answered without an icon, rather than failing to answer - the caller may remember that.
+  noIcon := (result = nil) and (repo.LastError = '') and (not cancelToken.IsCancelled);
+  //Icon requests each run on a thread of their own, so a failure noted here would never be cleared by a later
+  //request on this thread - and a failed icon is not a reason to tell the user the source is unavailable.
+  repo.ClearLastError;
 end;
 
 function TPackageRepositoryManager.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;

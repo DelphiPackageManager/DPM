@@ -631,6 +631,7 @@ var
   serviceItem : IServiceIndexItem;
   path : string;
   stream : TMemoryStream;
+  iconKind : TPackageIconKind;
   uri : IUri;
 begin
   result := nil;
@@ -662,6 +663,13 @@ begin
     end;
   end;
 
+  //The server's answer when the version has no icon - an answer, not a failure (nil with no LastError).
+  if response.StatusCode = 404 then
+  begin
+    Logger.Verbose('Source [' + Name + '] has no icon for [' + packageId + ' ' + packageVersion + ']');
+    exit;
+  end;
+
   if response.StatusCode <> 200 then
   begin
     RequestFailed('returned an error : ' + ResponseError(response));
@@ -674,22 +682,27 @@ begin
     exit;
   end;
 
-
+  //anything but png or svg is an icon we can't show - as good as none.
   if SameText(response.ContentType, 'image/png') then
-  begin
-    stream := TMemoryStream.Create;
-    response.ResponseStream.Seek(0, soFromBeginning);
-    stream.CopyFrom(response.ResponseStream,response.ContentLength);
-    result := CreatePackageIcon(TPackageIconKind.ikPng, stream);
-  end
+    iconKind := TPackageIconKind.ikPng
   else if SameText(response.ContentType, 'image/svg+xml') then
+    iconKind := TPackageIconKind.ikSvg
+  else
   begin
-    stream := TMemoryStream.Create;
-    stream.CopyFrom(response.ResponseStream,response.ContentLength);
-    result := CreatePackageIcon(TPackageIconKind.ikSvg, stream);
+    Logger.Verbose('Source [' + Name + '] sent an icon of type [' + response.ContentType + '] for [' + packageId + ' ' + packageVersion + '] - only png and svg are shown');
+    exit;
   end;
 
-
+  stream := TMemoryStream.Create;
+  try
+    response.ResponseStream.Seek(0, soFromBeginning);
+    stream.CopyFrom(response.ResponseStream, response.ContentLength);
+  except
+    stream.Free;
+    raise;
+  end;
+  //the icon owns the stream.
+  result := CreatePackageIcon(iconKind, stream);
 end;
 
 function TDPMServerPackageRepository.GetPackageInfo(const cancellationToken : ICancellationToken; const packageId : IPackageIdentity) : IPackageInfo;

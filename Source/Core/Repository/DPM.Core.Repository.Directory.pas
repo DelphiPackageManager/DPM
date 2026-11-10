@@ -414,6 +414,8 @@ begin
       on e : Exception do
       begin
         Logger.Warning(TWarningCode.W1207_PackageEntryUnreadable, 'Unable to read the package [' + packagFileName + '] in [' + Name + '] : ' + e.Message);
+        //couldn't look, which is not the same as the package having no icon - see IPackageRepository.GetPackageIcon.
+        RequestFailed('could not read the package [' + packagFileName + '] : ' + e.Message);
         exit;
       end;
     end;

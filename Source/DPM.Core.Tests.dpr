@@ -192,6 +192,7 @@ uses
   DPM.Core.Package.Signing in 'Core\Package\Signing\DPM.Core.Package.Signing.pas',
   DependencyVersionTests in 'Tests\DependencyVersionTests.pas',
   DPM.Core.Tests.Cache.PackageHash in 'Tests\DPM.Core.Tests.Cache.PackageHash.pas',
+  DPM.Core.Tests.Cache.Icons in 'Tests\DPM.Core.Tests.Cache.Icons.pas',
   DPM.Core.Tests.Cache.Verify in 'Tests\DPM.Core.Tests.Cache.Verify.pas',
   DPM.Core.Tests.Crypto.Hashing in 'Tests\DPM.Core.Tests.Crypto.Hashing.pas',
   DPM.Core.Tests.Dependency.Resolver in 'Tests\DPM.Core.Tests.Dependency.Resolver.pas',

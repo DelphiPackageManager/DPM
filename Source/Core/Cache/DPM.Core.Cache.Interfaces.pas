@@ -36,6 +36,9 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Spec.Interfaces;
 
+const
+  //how long a source's "this version has no icon" answer is believed - see IPackageCache.IsPackageIconMissing.
+  cIconMissingRetryDays = 7;
 
 type
   IPackageCache = interface
@@ -116,13 +119,32 @@ type
                                                       const preRelease : boolean) : IList<IPackageInfo>;
 
     /// <summary>
-    ///  Returns the package's icon directly from the extracted cache folder
-    ///  (icon.svg / icon.png), avoiding a network call. Used by the IDE for
-    ///  installed packages. Returns false (and icon = nil) when the package
-    ///  is not in the cache or has no embedded icon.
+    ///  Returns the package version's icon without a network call : the one a finished
+    ///  install of the package holds (icon.svg / icon.png in the extracted folder), otherwise
+    ///  one SavePackageIcon kept. Returns false (and icon = nil) when there is neither.
     /// </summary>
-    //For display, like GetPackageMetadata : the icon a finished install of the package holds.
+    //For display, like GetPackageMetadata.
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+
+    /// <summary>
+    ///  Keeps an icon downloaded for a package version, beside the package files in the
+    ///  cache, so TryGetPackageIcon finds it and it is not downloaded again. A version's
+    ///  icon never changes, so it is kept until the package is removed from the cache.
+    ///  Best effort - a failure to save is logged (debug) and otherwise ignored.
+    /// </summary>
+    procedure SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon);
+
+    /// <summary>
+    ///  Records that the package version's source has no icon for it, so it is not asked
+    ///  again for a while - see IsPackageIconMissing. Best effort, like SavePackageIcon.
+    /// </summary>
+    procedure SavePackageIconMissing(const packageId : IPackageIdentity);
+
+    /// <summary>
+    ///  True when SavePackageIconMissing recorded, less than cIconMissingRetryDays ago, that
+    ///  the version has no icon. After that the source is asked again.
+    /// </summary>
+    function IsPackageIconMissing(const packageId : IPackageIdentity) : boolean;
 
     /// <summary>
     ///  Resolves the SHA-256 hash of the package's .dpkg file. Self-heals

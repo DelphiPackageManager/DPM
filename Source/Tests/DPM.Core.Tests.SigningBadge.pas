@@ -78,6 +78,9 @@ type
                                                       const versionRange : TVersionRange;
                                                       const preRelease : boolean) : IList<IPackageInfo>;
     function TryGetPackageIcon(const packageId : IPackageIdentity; out icon : IPackageIcon) : boolean;
+    procedure SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon);
+    procedure SavePackageIconMissing(const packageId : IPackageIdentity);
+    function IsPackageIconMissing(const packageId : IPackageIdentity) : boolean;
     function GetPackageHash(const packageId : IPackageIdentity) : string;
     function FullReVerify(const cancellationToken : ICancellationToken) : integer;
     function GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;
@@ -126,6 +129,9 @@ begin
   result := false;
   icon := nil;
 end;
+procedure TStubCache.SavePackageIcon(const packageId : IPackageIdentity; const icon : IPackageIcon); begin end;
+procedure TStubCache.SavePackageIconMissing(const packageId : IPackageIdentity); begin end;
+function TStubCache.IsPackageIconMissing(const packageId : IPackageIdentity) : boolean; begin result := false; end;
 function TStubCache.GetPackageHash(const packageId : IPackageIdentity) : string; begin result := ''; end;
 function TStubCache.FullReVerify(const cancellationToken : ICancellationToken) : integer; begin result := 0; end;
 function TStubCache.GetCachedPackagesMatching(const id : string; const compilerVersion : TCompilerVersion; const version : string) : IList<IPackageIdentity>;

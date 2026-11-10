@@ -38,6 +38,13 @@ type
     //dpm mcp --source - the versions query asks only the sources named.
     [Test]
     procedure Versions_Query_Asks_Only_The_Sources_Named;
+    //the IDE remembers a version having no icon - but only when the source said so, not when it couldn't be asked.
+    [Test]
+    procedure Icon_Source_Without_An_Icon_Says_So;
+    [Test]
+    procedure Icon_Source_That_Fails_Is_Not_Without_An_Icon;
+    [Test]
+    procedure Cancelled_Icon_Request_Is_Not_Without_An_Icon;
   end;
 
 implementation
@@ -170,7 +177,9 @@ end;
 
 function TCountingSource.GetPackageIcon(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageIcon;
 begin
+  //none of its packages has an icon - Bad* can't be asked.
   result := nil;
+  Answer;
 end;
 
 function TCountingSource.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion) : IPackageSearchResultItem;
@@ -548,6 +557,58 @@ begin
   Assert.AreEqual('', manager.UnavailableSources, 'BadOne was asked');
   manager.GetPackageVersions(TCancellationTokenSourceFactory.Create.Token, TCompilerVersion.Delphi12_0, 'Some.Package', false);
   Assert.AreEqual('BadOne', manager.UnavailableSources, 'precondition : unrestricted, it is asked');
+end;
+
+procedure TRepositoryManagerTests.Icon_Source_Without_An_Icon_Says_So;
+var
+  manager : IPackageRepositoryManager;
+  icon : IPackageIcon;
+  noIcon : boolean;
+begin
+  manager := TPackageRepositoryManager.Create(TTestLogger.Create, TCountingFactory.Create);
+  Assert.IsTrue(manager.Initialize(NewConfig(['Good'])));
+
+  icon := manager.GetPackageIcon(TCancellationTokenSourceFactory.Create.Token, 'Good', 'Some.Package', '1.0.0', TCompilerVersion.Delphi12_0, noIcon);
+
+  Assert.IsNull(icon);
+  Assert.IsTrue(noIcon, 'the source answered, without an icon');
+end;
+
+procedure TRepositoryManagerTests.Icon_Source_That_Fails_Is_Not_Without_An_Icon;
+var
+  access : TManagerAccess;
+  manager : IPackageRepositoryManager;
+  icon : IPackageIcon;
+  noIcon : boolean;
+begin
+  access := TManagerAccess.Create(TTestLogger.Create, TCountingFactory.Create);
+  manager := access;
+  Assert.IsTrue(manager.Initialize(NewConfig(['BadOne'])));
+
+  icon := manager.GetPackageIcon(TCancellationTokenSourceFactory.Create.Token, 'BadOne', 'Some.Package', '1.0.0', TCompilerVersion.Delphi12_0, noIcon);
+
+  Assert.IsNull(icon);
+  Assert.IsFalse(noIcon, 'the source could not be asked - that is not an answer');
+  //icon requests each run on a thread of their own - nothing may be left behind for the thread.
+  Assert.AreEqual('', access.GetRepositoryByName('BadOne').LastError, 'the error should not be kept for the thread');
+end;
+
+procedure TRepositoryManagerTests.Cancelled_Icon_Request_Is_Not_Without_An_Icon;
+var
+  manager : IPackageRepositoryManager;
+  tokenSource : ICancellationTokenSource;
+  icon : IPackageIcon;
+  noIcon : boolean;
+begin
+  manager := TPackageRepositoryManager.Create(TTestLogger.Create, TCountingFactory.Create);
+  Assert.IsTrue(manager.Initialize(NewConfig(['Good'])));
+  tokenSource := TCancellationTokenSourceFactory.Create;
+  tokenSource.Cancel;
+
+  icon := manager.GetPackageIcon(tokenSource.Token, 'Good', 'Some.Package', '1.0.0', TCompilerVersion.Delphi12_0, noIcon);
+
+  Assert.IsNull(icon);
+  Assert.IsFalse(noIcon, 'a cancelled request never asked');
 end;
 
 initialization

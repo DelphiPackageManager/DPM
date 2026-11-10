@@ -70,6 +70,9 @@ const
   cNewerStableColor : TColor = $0052A833;      //green       - RGB(51,168,82)
   cNewerPrereleaseColor : TColor = $000D73D9;  //dark orange - RGB(217,115,13)
 
+  //icon downloads running at once - each runs on a thread of its own, and a long result list asks for an icon per row.
+  cMaxIconRequests = 4;
+
 type
   TPackageRowKind = (rkInstalledHeader, rkImplicitHeader, rkAvailableHeader, rkInstalledPackage, rkImplicitPackage, rkAvailablePackage, rkUnknown);
 
@@ -155,6 +158,10 @@ type
     FProject : IOTAProject;
 
     FIconCache : TDPMIconCache;
+    //icons waiting for a download slot - a stack, so the rows painted last (the ones on screen now) go first.
+    FIconQueue : IStack<IPackageSearchResultItem>;
+    //icon downloads running now - never more than cMaxIconRequests.
+    FIconRequestsRunning : integer;
     FDPMIDEOptions : IDPMIDEOptions;
 
     FSearchOptions : TSearchOptions;
@@ -203,7 +210,11 @@ type
     function GetPackageReferences : IPackageReference;
     procedure InvalidatePackageReferences;
     function GetPackageIdsFromReferences : IList<IPackageIdentity>;
+    //Shows the package's icon from the package cache when it is there, otherwise queues a download.
     procedure RequestPackageIcon(const index : integer; const Package : IPackageSearchResultItem);
+    //Starts queued icon downloads while fewer than cMaxIconRequests are running.
+    procedure StartQueuedIconRequests;
+    procedure StartIconRequest(const package : IPackageSearchResultItem);
 
     function GetInstalledPackagesAsync : IAwaitable<IList<IPackageSearchResultItem>>;
     //Synchronous best-effort paint sourced from the local package cache so the installed list
@@ -537,6 +548,8 @@ begin
   FIconTokenSource := TCancellationTokenSourceFactory.Create;
 
   FIconCache := TDPMIconCache.Create;
+  FIconQueue := TCollections.CreateStack<IPackageSearchResultItem>;
+  FIconRequestsRunning := 0;
   FRowLayout := TRowLayout.Create(10, 24);
   FLock := TCriticalSection.Create;
   // not published in older versions, so get removed when we edit in older versions.
@@ -1379,25 +1392,20 @@ procedure TDPMEditViewFrame.RequestPackageIcon(const index : integer; const Pack
 var
   Id : string;
   Version : string;
-  source : string;
-  repoManager : IPackageRepositoryManager;
   stopWatch : TStopWatch;
   cachedIcon : IPackageIcon;
   cachedImage : IPackageIconImage;
   identity : IPackageIdentity;
-  lifetime : IViewLifetime;
 begin
-  stopWatch.Start;
+  stopWatch := TStopwatch.StartNew;
 
-  // local for capture for use in the anonymous methods below.
   Id := package.Id;
   Version := package.Version.ToStringNoMeta;
-  source := package.SourceName;
   FLogger.Debug('DPMIDE : Requesting icon for [' + Id + '.' + Version + ']');
 
-  //Installed packages already have their .dpkg extracted in the local cache; the embedded
-  //icon.svg / icon.png can be served without a network round-trip.
-  if Package.Installed and (FPackageCache <> nil) then
+  //The package cache has the icon when the package is installed (in its extracted folder) or the icon was
+  //downloaded before (kept beside the package files) - either way no network round-trip, and no thread.
+  if FPackageCache <> nil then
   begin
     identity := TPackageIdentity.Create('', Id, Package.Version, IDECompilerVersion);
     if FPackageCache.TryGetPackageIcon(identity, cachedIcon) and (cachedIcon <> nil) then
@@ -1417,52 +1425,124 @@ begin
       end;
       exit;
     end;
+    //the source said recently that it has no icon for this version - FIconCache holds nil for it already (Query).
+    if FPackageCache.IsPackageIconMissing(identity) then
+    begin
+      FLogger.Debug('DPMIDE : No icon for [' + Id + '.' + Version + '] (recorded in the package cache)');
+      exit;
+    end;
   end;
 
+  FIconQueue.Push(Package);
+  StartQueuedIconRequests;
+end;
+
+procedure TDPMEditViewFrame.StartQueuedIconRequests;
+var
+  package : IPackageSearchResultItem;
+begin
+  while (FIconRequestsRunning < cMaxIconRequests) and FIconQueue.TryPop(package) do
+    StartIconRequest(package);
+end;
+
+procedure TDPMEditViewFrame.StartIconRequest(const package : IPackageSearchResultItem);
+var
+  Id : string;
+  Version : string;
+  source : string;
+  repoManager : IPackageRepositoryManager;
+  packageCache : IPackageCache;
+  identity : IPackageIdentity;
+  stopWatch : TStopWatch;
+  lifetime : IViewLifetime;
+begin
+  // local for capture for use in the anonymous methods below.
+  Id := package.Id;
+  Version := package.Version.ToStringNoMeta;
+  source := package.SourceName;
+  identity := TPackageIdentity.Create('', Id, package.Version, IDECompilerVersion);
+  packageCache := FPackageCache;
   repoManager := FRepositoryManager;
-  repoManager.Initialize(FConfiguration);
   lifetime := FLifetime;
+  stopWatch := TStopwatch.StartNew;
 
-  TAsync.Configure<IPackageIcon>(
-    function(const cancelToken : ICancellationToken) : IPackageIcon
-    begin
-      result := repoManager.GetPackageIcon(cancelToken, source, Id, Version, IDECompilerVersion);
-    end, FIconTokenSource.Token)
-    .OnException(
-    procedure(const e : Exception)
-    begin
-      if not lifetime.Alive then
-        exit;
-      FLogger.Debug('DPMIDE : Unable to get the icon for [' + Id + '.' + Version + '] : ' + e.Message);
-    end)
-    .Await(
-    procedure(const theResult : IPackageIcon)
-    var
-      Icon : IPackageIconImage;
-    begin
-      //the icon is for an id, whichever load asked - only the view having gone makes it unwanted.
-      if not lifetime.Alive then
-        exit;
-
-      // the result can be nil if there is no icon found
-      if theResult <> nil then
-        try
-          Icon := TPackageIconImage.Create(theResult);
-        except
-          Icon := nil;
-          FLogger.Debug('DPMIDE : INVALID icon for [' + Id + '.' + Version + ']');
+  //Exactly one of OnException, OnCancellation and Await runs (on the main thread) for each request - each lets go
+  //of its slot and starts the next queued request. Unless the view has gone, when there is nothing left to do.
+  Inc(FIconRequestsRunning);
+  try
+    repoManager.Initialize(FConfiguration);
+    TAsync.Configure<IPackageIcon>(
+      function(const cancelToken : ICancellationToken) : IPackageIcon
+      var
+        noIcon : boolean;
+      begin
+        result := repoManager.GetPackageIcon(cancelToken, source, Id, Version, IDECompilerVersion, noIcon);
+        //kept so the next view (or the next IDE session) doesn't download it again - saved here, on the worker,
+        //as it writes files.
+        if packageCache <> nil then
+        begin
+          if result <> nil then
+            packageCache.SavePackageIcon(identity, result)
+          else if noIcon then
+            packageCache.SavePackageIconMissing(identity);
         end;
+      end, FIconTokenSource.Token)
+      .OnException(
+      procedure(const e : Exception)
+      begin
+        if not lifetime.Alive then
+          exit;
+        Dec(FIconRequestsRunning);
+        FLogger.Debug('DPMIDE : Unable to get the icon for [' + Id + '.' + Version + '] : ' + e.Message);
+        StartQueuedIconRequests;
+      end)
+      .OnCancellation(
+      procedure
+      begin
+        if not lifetime.Alive then
+          exit;
+        Dec(FIconRequestsRunning);
+        StartQueuedIconRequests;
+      end)
+      .Await(
+      procedure(const theResult : IPackageIcon)
+      var
+        Icon : IPackageIconImage;
+      begin
+        //the icon is for an id, whichever load asked - only the view having gone makes it unwanted.
+        if not lifetime.Alive then
+          exit;
+        Dec(FIconRequestsRunning);
 
-      // we will cache nil to stop future pointeless requests.
-      FIconCache.Cache(Id, Icon);
-      stopWatch.Stop;
-      if Icon <> nil then
-        FLogger.Debug('DPMIDE : Got icon for [' + Id + '.' + Version + '] in ' + intToStr(stopWatch.ElapsedMilliseconds) + 'ms');
-      if Icon <> nil then
-        // FScrollList.InvalidateRow(index);
-        // TODO : Instead request repaint of row.
-        FScrollList.Invalidate;
-    end);
+        // the result can be nil if there is no icon found
+        if theResult <> nil then
+          try
+            Icon := TPackageIconImage.Create(theResult);
+          except
+            Icon := nil;
+            FLogger.Debug('DPMIDE : INVALID icon for [' + Id + '.' + Version + ']');
+          end;
+
+        // we will cache nil to stop future pointeless requests.
+        FIconCache.Cache(Id, Icon);
+        stopWatch.Stop;
+        if Icon <> nil then
+        begin
+          FLogger.Debug('DPMIDE : Got icon for [' + Id + '.' + Version + '] in ' + intToStr(stopWatch.ElapsedMilliseconds) + 'ms');
+          // FScrollList.InvalidateRow(index);
+          // TODO : Instead request repaint of row.
+          FScrollList.Invalidate;
+        end;
+        StartQueuedIconRequests;
+      end);
+  except
+    //the request never started (no thread to run it on) - so nothing will hand the slot back but us.
+    on e : Exception do
+    begin
+      Dec(FIconRequestsRunning);
+      FLogger.Debug('DPMIDE : Unable to request the icon for [' + Id + '.' + Version + '] : ' + e.Message);
+    end;
+  end;
 end;
 
 procedure TDPMEditViewFrame.SaveBeforeInstall;
