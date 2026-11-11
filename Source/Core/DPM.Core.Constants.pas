@@ -63,6 +63,11 @@ const
   //local mirror folder for git-URL package registries (folder registries are read in place)
   cDefaultRegistriesFolder = cDefaultDPMFolder + '\registries';
 
+  //what folder sources' package sidecars held, so a search reads only what changed - see DPM.Core.Repository.Directory.Index.
+  cDefaultFolderIndexFolder = cDefaultDPMFolder + '\folder-index';
+  //off, 0 or false turns that index off.
+  cDPMFolderIndexEnvironmentVar = 'DPMFOLDERINDEX';
+
   //default minutes between auto-pulls of a git-URL registry mirror. 0 = always pull,
   //negative = never auto-pull (explicit `dpm sources refresh` only).
   cDefaultRegistryRefreshMinutes = 60;

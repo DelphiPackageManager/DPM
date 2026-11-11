@@ -41,7 +41,8 @@ uses
   DPM.Core.Package.Interfaces,
   DPM.Core.Configuration.Interfaces,
   DPM.Core.Repository.Interfaces,
-  DPM.Core.Repository.Base;
+  DPM.Core.Repository.Base,
+  DPM.Core.Repository.Directory.Index;
 
 type
   TReadManifestFunc = reference to function(const name : string; const manifest : IPackageSpec; const fileHash :string; const hashAlgorithm : string) : IInterface;
@@ -50,17 +51,38 @@ type
   private
     FPermissionsChecked : boolean;
     FIsWritable : boolean;
+    FIndexEnabled : boolean;
+    FIndexFolder : string;
+    FIndexes : IDictionary<TCompilerVersion, IFolderSourceIndex>;
+    procedure SetIndexFolder(const value : string);
+    function ReadSpecSidecar(const reader : IPackageSpecReader; const fileName : string; out specText : string) : IPackageSpec;
   protected
+    procedure Configure(const source : ISourceConfig); override;
     procedure CheckWritable(const folder : string);
 
-    function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc) : IInterface;
+    //What this source's package sidecars held, for compilerVersion (see DPM.Core.Repository.Directory.Index) - nil
+    //when the index is turned off.
+    function GetIndex(const compilerVersion : TCompilerVersion) : IFolderSourceIndex;
+    //The reads of the share the index saves - virtual so a test can count them.
+    function ReadHashFile(const fileName : string) : string; virtual;
+    function ReadSpecFile(const fileName : string) : string; virtual;
+    function HashPackageFile(const fileName : string) : string; virtual;
+
+    //listing and index are given only by the reads that are shown (they ask for the hash) : the index is used when
+    //listing saw the package, and nothing else ever reaches it.
+    function DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc;
+                                  const listing : IFolderListing = nil; const index : IFolderSourceIndex = nil) : IInterface;
+    //GetPackageMetaData without saving the index - for callers asking about several packages, who save once.
+    function DoGetPackageMetaDataForDisplay(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string;
+                                            const compilerVersion : TCompilerVersion; const index : IFolderSourceIndex) : IPackageSearchResultItem;
 
 
     function DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms) : IList<string>;
     function DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms; const version : string) : IList<string>;
 
     function DoGetPackageFeedFiles(const searchTerm : string; const exact : boolean; const compilerVersion : TCompilerVersion) : IList<string>;
-    function DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>) : IList<IPackageSearchResultItem>;
+    function DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>;
+                              const listing : IFolderListing; const index : IFolderSourceIndex) : IList<IPackageSearchResultItem>;
 
 
     function DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
@@ -95,6 +117,8 @@ type
 
   public
     constructor Create(const logger : ILogger); override;
+    //Where the index files go - the per-user folder, unless a test says otherwise.
+    property IndexFolder : string read FIndexFolder write SetIndexFolder;
   end;
 
 implementation
@@ -119,7 +143,8 @@ uses
   DPM.Core.Package.SearchResults,
   DPM.Core.Utils.DateTime,
   DPM.Core.Package.ListItem, DPM.Core.Package.PackageLatestVersionInfo, DPM.Core.Utils.Hash,
-  DPM.Core.Utils.Files;
+  DPM.Core.Utils.Files,
+  DPM.Core.Utils.System;
 
 { TDirectoryPackageRespository }
 
@@ -160,6 +185,35 @@ begin
 
 end;
 
+function CompilerVersionToSearchPart(const compilerVersion : TCompilerVersion) : string;
+begin
+  case compilerVersion of
+    TCompilerVersion.UnknownVersion : result := '*';
+  else
+    result := CompilerToString(compilerVersion);
+  end;
+end;
+
+//What a search for searchTerm lists the folder with, up to the file's extension. Ending there, it also matches the
+//sidecars beside each package, which share its name.
+function FeedPattern(const searchTerm : string; const exact : boolean; const compilerVersion : TCompilerVersion) : string;
+begin
+  result := searchTerm;
+  if (result <> '*') and (not exact) then
+    result := '*' + result + '*';
+  result := result + '-' + CompilerVersionToSearchPart(compilerVersion) + '-' + '*';
+end;
+
+//What a package's files are listed with : {id}-{compiler}-{platforms}-{version}, then extension.
+function ExactListPattern(const id : string; const compilerVersion : TCompilerVersion; const version : string; const extension : string) : string;
+begin
+  result := id + '-' + CompilerVersionToSearchPart(compilerVersion) + '-*';
+  if version <> '' then
+    result := result + '-' + version + extension
+  else
+    result := result + '-*' + extension;
+end;
+
 
 
 
@@ -177,6 +231,94 @@ begin
   inherited Create(logger);
   FPermissionsChecked := false;
   FIsWritable := false;
+  FIndexEnabled := FolderIndexEnabled;
+  FIndexFolder := TSystemUtils.ExpandEnvironmentStrings(cDefaultFolderIndexFolder);
+  FIndexes := TCollections.CreateDictionary<TCompilerVersion, IFolderSourceIndex>;
+end;
+
+procedure TDirectoryPackageRepository.Configure(const source : ISourceConfig);
+begin
+  inherited Configure(source);
+  //an index is of one folder.
+  EnterLock;
+  try
+    FIndexes.Clear;
+  finally
+    LeaveLock;
+  end;
+end;
+
+procedure TDirectoryPackageRepository.SetIndexFolder(const value : string);
+begin
+  EnterLock;
+  try
+    FIndexFolder := value;
+    FIndexes.Clear;
+  finally
+    LeaveLock;
+  end;
+end;
+
+function TDirectoryPackageRepository.GetIndex(const compilerVersion : TCompilerVersion) : IFolderSourceIndex;
+begin
+  result := nil;
+  if (not FIndexEnabled) or (compilerVersion = TCompilerVersion.UnknownVersion) or (SourceUri = '') then
+    exit;
+  EnterLock;
+  try
+    if FIndexFolder = '' then
+      exit;
+    if not FIndexes.TryGetValue(compilerVersion, result) then
+    begin
+      result := TFolderSourceIndex.Create(Logger, FolderIndexFileName(FIndexFolder, SourceUri, compilerVersion), SourceUri, compilerVersion);
+      FIndexes[compilerVersion] := result;
+    end;
+  finally
+    LeaveLock;
+  end;
+end;
+
+function TDirectoryPackageRepository.ReadHashFile(const fileName : string) : string;
+begin
+  result := Trim(TFile.ReadAllText(fileName));
+end;
+
+function TDirectoryPackageRepository.HashPackageFile(const fileName : string) : string;
+begin
+  result := THashSHA256.GetHashStringFromFile(fileName);
+end;
+
+//The text of the spec sidecar, decoded as TYAML.LoadFromFile (which ReadSpec uses) decodes it : by its BOM, or as
+//UTF-8 without one.
+function TDirectoryPackageRepository.ReadSpecFile(const fileName : string) : string;
+var
+  bytes : TBytes;
+  encoding : TEncoding;
+  start : integer;
+begin
+  bytes := TFile.ReadAllBytes(fileName);
+  encoding := nil;
+  start := TEncoding.GetBufferEncoding(bytes, encoding);
+  if start = 0 then
+    encoding := TEncoding.UTF8;
+  result := encoding.GetString(bytes, start, Length(bytes) - start);
+end;
+
+//The spec sidecar, read as ReadSpec reads it, and the text it held.
+function TDirectoryPackageRepository.ReadSpecSidecar(const reader : IPackageSpecReader; const fileName : string; out specText : string) : IPackageSpec;
+begin
+  result := nil;
+  specText := '';
+  try
+    specText := ReadSpecFile(fileName);
+  except
+    on e : Exception do
+    begin
+      Logger.Error(TErrorCode.E6002_SpecUnreadable, 'Unable to read the spec [' + fileName + '] : ' + e.Message);
+      exit;
+    end;
+  end;
+  result := reader.ReadSpecString(specText, fileName);
 end;
 
 function TDirectoryPackageRepository.DownloadPackage(const cancellationToken : ICancellationToken; const packageInfo : IPackageInfo; const localFolder : string; var fileName : string) : boolean;
@@ -458,6 +600,10 @@ var
   allFiles : IList<string>;
   distinctFiles : IEnumerable<string>;
   first : integer;
+  index : IFolderSourceIndex;
+  listing : IFolderListing;
+  patterns : TArray<string>;
+  fullListing : boolean;
 begin
   Logger.Debug('TDirectoryPackageRepository.GetPackageFeed');
   result := TDPMPackageSearchResult.Create(options.Skip,0);
@@ -474,20 +620,50 @@ begin
     searchTerms[0] := '*';
   end;
 
-  allFiles := TCollections.CreateList < string > ;
-  for i := 0 to Length(searchTerms) - 1 do
+  index := GetIndex(compilerVersion);
+  listing := nil;
+  fullListing := false;
+  if index <> nil then
   begin
+    //one pass per term that also sees each package's sidecars, for the index.
+    SetLength(patterns, Length(searchTerms));
+    for i := 0 to Length(searchTerms) - 1 do
+    begin
+      patterns[i] := FeedPattern(searchTerms[i], options.Exact, compilerVersion);
+      //every package of the compiler is listed.
+      if searchTerms[i] = '*' then
+        fullListing := true;
+    end;
     if cancelToken.IsCancelled then
       exit;
-    allFiles.AddRange(DoGetPackageFeedFiles(searchTerms[i], options.Exact, compilerVersion));
-  end;
+    listing := ListFolder(SourceUri, patterns, cPackageFileExt);
+    searchFiles := listing.PackageFiles;
+  end
+  else
+  begin
+    allFiles := TCollections.CreateList < string > ;
+    for i := 0 to Length(searchTerms) - 1 do
+    begin
+      if cancelToken.IsCancelled then
+        exit;
+      allFiles.AddRange(DoGetPackageFeedFiles(searchTerms[i], options.Exact, compilerVersion));
+    end;
 
-  distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
-  searchFiles := TCollections.CreateList<string>(distinctFiles);
+    distinctFiles := TDistinctIterator<string>.Create(allFiles, TStringComparer.OrdinalIgnoreCase);
+    searchFiles := TCollections.CreateList<string>(distinctFiles);
+  end;
 
   //a package per id, from all of its versions' files - the page is of those, in id order so it is the same page
   //each time.
-  results := DoGetPackageFeed(cancelToken, options, searchFiles);
+  try
+    results := DoGetPackageFeed(cancelToken, options, searchFiles, listing, index);
+    //the entries of packages no longer in the folder go - only a listing of all of them can say which.
+    if fullListing then
+      index.Prune(listing);
+  finally
+    if index <> nil then
+      index.Save;
+  end;
   results.Sort(
     function(const Left, Right : IPackageSearchResultItem) : integer
     begin
@@ -551,33 +727,39 @@ var
   item : IPackageIdentity;
   metaData : IPackageSearchResultItem;
   latestVersionInfo : IPackageLatestVersionInfo;
+  index : IFolderSourceIndex;
 begin
   result := TDPMPackageSearchResult.Create(0,0);
-  for item in ids do
-  begin
-    //Determine the latest version first, independently of whether the installed
-    //version is present in this folder. Otherwise a source that only carries a
-    //newer (or prerelease) version than the installed one would report nothing,
-    //and its update would never reach the repo manager merge.
-    latestVersionInfo := GetPackageLatestVersion(cancellationToken, item.id, compilerVersion);
-    if latestVersionInfo = nil then
-      continue;
-
-    //Prefer the installed version's metadata for the row, but fall back to the
-    //latest available version's metadata when the installed .dpkg is not here.
-    metaData := GetPackageMetaData(cancellationToken, item.Id, item.Version.ToString, compilerVersion);
-    if metaData = nil then
-      metaData := GetPackageMetaData(cancellationToken, item.Id, latestVersionInfo.LatestVersion.ToString, compilerVersion);
-
-    if metaData <> nil then
+  index := GetIndex(compilerVersion);
+  try
+    for item in ids do
     begin
-      metaData.LatestVersion := latestVersionInfo.LatestVersion;
-      metaData.LatestStableVersion := latestVersionInfo.LatestStableVersion;
-      result.Results.Add(metaData);
+      //Determine the latest version first, independently of whether the installed
+      //version is present in this folder. Otherwise a source that only carries a
+      //newer (or prerelease) version than the installed one would report nothing,
+      //and its update would never reach the repo manager merge.
+      latestVersionInfo := GetPackageLatestVersion(cancellationToken, item.id, compilerVersion);
+      if latestVersionInfo = nil then
+        continue;
+
+      //Prefer the installed version's metadata for the row, but fall back to the
+      //latest available version's metadata when the installed .dpkg is not here.
+      metaData := DoGetPackageMetaDataForDisplay(cancellationToken, item.Id, item.Version.ToString, compilerVersion, index);
+      if metaData = nil then
+        metaData := DoGetPackageMetaDataForDisplay(cancellationToken, item.Id, latestVersionInfo.LatestVersion.ToString, compilerVersion, index);
+
+      if metaData <> nil then
+      begin
+        metaData.LatestVersion := latestVersionInfo.LatestVersion;
+        metaData.LatestStableVersion := latestVersionInfo.LatestStableVersion;
+        result.Results.Add(metaData);
+      end;
     end;
+  finally
+    //once for them all.
+    if index <> nil then
+      index.Save;
   end;
-
-
 end;
 
 //function TDirectoryPackageRepository.GetPackageLatestVersions(const cancellationToken: ICancellationToken; const ids: IList<IPackageId>; const platform: TDPMPlatform; const compilerVersion: TCompilerVersion): IDictionary<string, IPackageLatestVersionInfo>;
@@ -635,7 +817,23 @@ end;
 
 function TDirectoryPackageRepository.GetPackageMetaData(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string; const compilerVersion : TCompilerVersion): IPackageSearchResultItem;
 var
+  index : IFolderSourceIndex;
+begin
+  index := GetIndex(compilerVersion);
+  try
+    result := DoGetPackageMetaDataForDisplay(cancellationToken, packageId, packageVersion, compilerVersion, index);
+  finally
+    if index <> nil then
+      index.Save;
+  end;
+end;
+
+function TDirectoryPackageRepository.DoGetPackageMetaDataForDisplay(const cancellationToken : ICancellationToken; const packageId : string; const packageVersion : string;
+                                                                    const compilerVersion : TCompilerVersion; const index : IFolderSourceIndex) : IPackageSearchResultItem;
+var
   matchingFiles : IList<string>;
+  listing : IFolderListing;
+  packageSuffix : string;
   packageFileName : string;
   readManifestFunc : TReadManifestFunc;
   metaData : IPackageMetadata;
@@ -643,7 +841,19 @@ var
   _hashAlgorithm : string;
 begin
   result := nil;
-  matchingFiles := DoExactList(packageId, compilerVersion, [], packageVersion);
+  listing := nil;
+  if index <> nil then
+  begin
+    //the files DoExactList finds, in one pass that also sees their sidecars, for the index.
+    if packageVersion <> '' then
+      packageSuffix := '-' + packageVersion + cPackageFileExt
+    else
+      packageSuffix := cPackageFileExt;
+    listing := ListFolder(SourceUri, [ExactListPattern(packageId, compilerVersion, packageVersion, '.*')], packageSuffix);
+    matchingFiles := listing.PackageFiles;
+  end
+  else
+    matchingFiles := DoExactList(packageId, compilerVersion, [], packageVersion);
   if matchingFiles.Count = 0 then
     exit;
   packageFileName := matchingFiles[0];
@@ -657,7 +867,7 @@ begin
                     _hashAlgorithm := hashAlgorithm;
                   end;
 
-  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, true, readManifestFunc) as IPackageMetaData;
+  metaData := DoGetPackageMetaData(cancellationToken, packageFileName, true, readManifestFunc, listing, index) as IPackageMetaData;
 
 
 
@@ -765,15 +975,6 @@ end;
 
 
 
-function CompilerVersionToSearchPart(const compilerVersion : TCompilerVersion) : string;
-begin
-  case compilerVersion of
-    TCompilerVersion.UnknownVersion : result := '*';
-  else
-    result := CompilerToString(compilerVersion);
-  end;
-end;
-
 function TDirectoryPackageRepository.DoExactList(const id : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms; const version : string) : IList<string>;
 var
   searchTerm : string;
@@ -781,14 +982,7 @@ var
   fileList : IList<string>;
 begin
   result := TCollections.CreateList < string > ;
-  searchTerm := id;
-  searchTerm := searchTerm + '-' + CompilerVersionToSearchPart(compilerVersion);
-  searchTerm := searchTerm + '-*';
-
-  if version <> '' then
-    searchTerm := searchTerm + '-' + version + cPackageFileExt
-  else
-    searchTerm := searchTerm + '-*' + cPackageFileExt;
+  searchTerm := ExactListPattern(id, compilerVersion, version, cPackageFileExt);
 
   try
     fileList := TDirectoryUtils.GetFiles(SourceUri, searchTerm);
@@ -812,10 +1006,7 @@ var
 begin
   Logger.Debug('TDirectoryPackageRepository.DoGetPackageFeedFiles');
   result := TCollections.CreateList<string>;
-  query := searchTerm;
-  if (query <> '*') and (not exact) then
-    query := '*' + query + '*';
-  query := query + '-' + CompilerVersionToSearchPart(compilerVersion) + '-' +  '*' + cPackageFileExt;
+  query := FeedPattern(searchTerm, exact, compilerVersion) + cPackageFileExt;
   files := TDirectoryUtils.GetFiles(SourceUri, query);
   result.AddRange(files);
 
@@ -830,7 +1021,8 @@ type
   end;
 
 
-function TDirectoryPackageRepository.DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>) : IList<IPackageSearchResultItem>;
+function TDirectoryPackageRepository.DoGetPackageFeed(const cancelToken : ICancellationToken; const options : TSearchOptions; const files : IList<string>;
+                                                      const listing : IFolderListing; const index : IFolderSourceIndex) : IList<IPackageSearchResultItem>;
 var
   searchRegEx : string;
   regex : TRegEx;
@@ -950,7 +1142,7 @@ begin
     _fileHash := '';
     _hashAlgorithm := '';
     try
-      packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, true, readManifestFunc) as IPackageMetadata;
+      packageMetadata := DoGetPackageMetaData(cancelToken, packageFileName, true, readManifestFunc, listing, index) as IPackageMetadata;
     except
       on e : Exception do
       begin
@@ -970,7 +1162,8 @@ begin
   end;
 end;
 
-function TDirectoryPackageRepository.DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc) : IInterface;
+function TDirectoryPackageRepository.DoGetPackageMetaData(const cancellationToken : ICancellationToken; const fileName : string; readHash : boolean; const readManifestFunc : TReadManifestFunc;
+                                                          const listing : IFolderListing; const index : IFolderSourceIndex) : IInterface;
 var
   zipFile : TZipFile;
   metaBytes : TBytes;
@@ -984,37 +1177,64 @@ var
   isSvg : boolean;
   hashFileName : string;
   fileHash : string;
+  specText : string;
+  useIndex : boolean;
+  stamps : TPackageFileStamps;
 begin
 //  Logger.Debug('TDirectoryPackageRepository.DoGetPackageMetaData');
   result := nil;
   if not FileExists(fileName) then
     exit;
-  //we might write to the source folder, so check if writable
-  CheckWritable(ExtractFilePath(fileName));
 
   reader := TPackageSpecReader.Create(Logger);
+
+  //This sidecar is the extracted copy of the in-archive 'package.dspec.yaml', so it keeps the legacy extension to
+  //match the archive entry's semantics and to avoid orphaning sidecars in existing caches.
+  manifestFileName := ChangeFileExt(fileName, cLegacyPackageSpecExt);
+
+  //Only what is shown comes from the index - those reads ask for the hash, and give the listing that found the
+  //package. A package the listing didn't see (its name worked out instead) can't be checked against it.
+  useIndex := readHash and (listing <> nil) and (index <> nil);
+  if useIndex then
+  begin
+    stamps := listing.StampsFor(fileName);
+    useIndex := stamps.Package.Present;
+  end;
+  if useIndex and index.TryGet(fileName, stamps, fileHash, specText) then
+  begin
+    manifest := reader.ReadSpecString(specText, manifestFileName);
+    if manifest <> nil then
+      exit(readManifestFunc(name, manifest, fileHash, cPackageHashAlgorithm));
+    //what was recorded doesn't read any more - forget it, and read the files.
+    index.Remove(fileName);
+  end;
+  fileHash := '';
+  specText := '';
 
   if readHash then
   begin
     hashFileName := fileName + cPackageHashAlgorithmExt;
     if FileExists(hashFileName) then
-      fileHash := Trim(TFile.ReadAllText(hashFileName))
+      fileHash := ReadHashFile(hashFileName)
     else
     begin
       //calulate file hash and save it for next time
-      fileHash := THashSHA256.GetHashStringFromFile(fileName);
+      fileHash := HashPackageFile(fileName);
+      //we might write to the source folder, so check if writable
+      CheckWritable(ExtractFilePath(fileName));
       if FIsWritable then
         TFile.WriteAllText(hashFileName, fileHash);
     end;
   end;
 
-  //first see if the dspec has been extracted already. This sidecar is the extracted copy
-  //of the in-archive 'package.dspec.yaml', so it keeps the legacy extension to match the
-  //archive entry's semantics and to avoid orphaning sidecars in existing caches.
-  manifestFileName := ChangeFileExt(fileName, cLegacyPackageSpecExt);
-
+  //first see if the dspec has been extracted already.
   if FileExists(manifestFileName) then
-    manifest := reader.ReadSpec(manifestFileName);
+  begin
+    if useIndex then
+      manifest := ReadSpecSidecar(reader, manifestFileName, specText)
+    else
+      manifest := reader.ReadSpec(manifestFileName);
+  end;
 
   if manifest = nil then
   begin
@@ -1069,6 +1289,9 @@ begin
     //metaString is the dspec YAML content extracted from the .dpkg, not a path.
     //Use ReadSpecString and pass the .dpkg path as the diagnostic filename.
     manifest := reader.ReadSpecString(metaString, fileName);
+    specText := metaString;
+    //we might write to the source folder, so check if writable
+    CheckWritable(ExtractFilePath(fileName));
     if FIsWritable then
     begin
       try
@@ -1090,7 +1313,10 @@ begin
 
 
   result := readManifestFunc(name, manifest, fileHash, cPackageHashAlgorithm);
-
+  //recorded under what the listing saw before these reads - had anything changed since, the next listing differs,
+  //and it is read again.
+  if useIndex and (result <> nil) then
+    index.Put(fileName, stamps, fileHash, specText);
 end;
 
 function TDirectoryPackageRepository.DoList(const searchTerm : string; const compilerVersion : TCompilerVersion; const platforms : TDPMPlatforms) : IList<string>;
@@ -1252,6 +1478,15 @@ begin
   end;
 end;
 
+//Raises when fileName is there and can't be removed : a push that leaves the old package's spec beside the new one
+//hasn't worked, and the user needs to know which file to delete.
+procedure RemoveStaleSidecar(const fileName : string);
+begin
+  if FileExists(fileName) and (not System.SysUtils.DeleteFile(fileName)) then
+    raise EInOutError.CreateFmt('the package was copied, but [%s] (read from the package it replaced) could not be removed : %s - delete it, or the old package''s details are used',
+                                [fileName, SysErrorMessage(GetLastError)]);
+end;
+
 function TDirectoryPackageRepository.Push(const cancellationToken : ICancellationToken; const pushOptions : TPushOptions): Boolean;
 var
   targetFile : string;
@@ -1288,10 +1523,15 @@ begin
     //caclulate file has from original file
     hashFile := targetFile + cPackageHashAlgorithmExt;
     hash := THashSHA256.GetHashStringFromFile(pushOptions.PackagePath);
-    //write to source.
-    TFile.WriteAllText(hashFile, hash, TEncoding.ANSI);
+    //write to source - in one go, so a reader never sees part of it (and fails the package as modified).
+    TFileUtils.AtomicWriteAllText(hashFile, hash, TEncoding.ASCII);
 
-    //TODO : Extract manifest and icon
+    //The spec and icon beside a package are read from it once and kept - those of the package this replaced are
+    //wrong now. Removed, the next read takes them from the new one. After the copy, so nothing reading in between
+    //takes them from the old package again.
+    RemoveStaleSidecar(ChangeFileExt(targetFile, cLegacyPackageSpecExt));
+    RemoveStaleSidecar(ChangeFileExt(targetFile, '.svg'));
+    RemoveStaleSidecar(ChangeFileExt(targetFile, '.png'));
 
     Logger.Information('Package pushed ok.', true);
     result := true;

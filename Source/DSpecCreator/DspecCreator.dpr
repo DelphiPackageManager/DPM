@@ -67,6 +67,7 @@ uses
   DPM.Core.Packaging.Writer in '..\Core\Packaging\DPM.Core.Packaging.Writer.pas',
   DPM.Core.Repository.Base in '..\Core\Repository\DPM.Core.Repository.Base.pas',
   DPM.Core.Repository.Directory in '..\Core\Repository\DPM.Core.Repository.Directory.pas',
+  DPM.Core.Repository.Directory.Index in '..\Core\Repository\DPM.Core.Repository.Directory.Index.pas',
   DPM.Core.Repository.Factory in '..\Core\Repository\DPM.Core.Repository.Factory.pas',
   DPM.Core.Repository.Http in '..\Core\Repository\DPM.Core.Repository.Http.pas',
   DPM.Core.Repository.Interfaces in '..\Core\Repository\DPM.Core.Repository.Interfaces.pas',

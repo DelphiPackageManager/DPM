@@ -102,15 +102,22 @@ begin
     yamlDoc := TYAML.LoadFromString(value);
     result := InternalReadPackageSpecYAML(fileName, yamlDoc);
   except
+    //named as ReadSpec names it, when it is known where the text came from.
     on e : EDPMError do
     begin
       result := nil;
-      FLogger.Error(e.Code, e.Message);
+      if fileName <> '' then
+        FLogger.Error(e.Code, 'Spec [' + fileName + '] : ' + e.Message)
+      else
+        FLogger.Error(e.Code, e.Message);
     end;
     on e : Exception do
     begin
       result := nil;
-      FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'Unable to read the spec : ' + e.Message);
+      if fileName <> '' then
+        FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'Unable to read the spec [' + fileName + '] : ' + e.Message)
+      else
+        FLogger.Error(TErrorCode.E6002_SpecUnreadable, 'Unable to read the spec : ' + e.Message);
     end;
   end;
 end;
