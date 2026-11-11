@@ -52,6 +52,7 @@ uses
   Vcl.Forms,
   DPM.Core.Utils.System,
   DPM.Core.Utils.Process,
+  DPM.Core.Version,
   DPM.IDE.Constants;
 
 var
@@ -203,6 +204,8 @@ begin
 end;
 
 function CreateWizard(const BorlandIDEServices : IBorlandIDEServices) : IOTAWizard;
+var
+  versionText : string;
 begin
   TSystemUtils.SetIsIDE; //so the core knows it's running in the IDE plugin. needed for design compile
   //Put our own folder (which holds dpm.exe) on the IDE process PATH so msbuild spawned by the IDE
@@ -213,9 +216,12 @@ begin
     result := TDPMWizard.Create;
     SplashImage := Vcl.Graphics.TBitmap.Create;
     SplashImage.LoadFromResourceName(HInstance, 'DPMIDELOGO');
-    SplashScreenServices.AddPluginBitmap(cWizardTitle, SplashImage.Handle);
+    //The license status argument is the line shown under the title on the splash screen (in
+    //parentheses after it in older IDEs), and in a label in the About box.
+    versionText := 'Version ' + TDPMVersion.CurrentVersionString;
+    SplashScreenServices.AddPluginBitmap(cWizardTitle, SplashImage.Handle, False, versionText);
 
-    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle, cWizardDescription, SplashImage.Handle);
+    (BorlandIDEServices as IOTAAboutBoxServices).AddPluginInfo(cWizardTitle, cWizardDescription, SplashImage.Handle, False, versionText);
 
 //    DumpEnvironmentOptionNames;
 
