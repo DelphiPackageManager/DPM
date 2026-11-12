@@ -18,7 +18,7 @@ DPM's initial developer is Vincent Parrett (DUnitX, FinalBuilder, Continua CI). 
 
 ## DPM Status
 
-DPM is in BETA, so whilst most features should work, there may be bugs. We're using it in production to build FinalBuilder and Automise.
+DPM is at V1 (after a long beta), is stable and ready general usage. We're using it in production to build FinalBuilder and Automise.
 
 ### What works
 
