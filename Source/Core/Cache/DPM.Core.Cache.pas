@@ -1285,11 +1285,31 @@ end;
 function TPackageCache.GetPackageMetadata(const packageId : IPackageIdentity) : IPackageMetadata;
 var
   spec : IPackageSpec;
+  key : string;
 begin
   result := nil;
   spec := ReadInstalledSpec(packageId);
-  if spec <> nil then
+  if spec = nil then
+    exit;
+  //The reader hands out a spec it found fault with - no id, no target platforms - having logged what, and in
+  //which file. This is for display, so such a package is one not to show rather than an error.
+  try
     result := TPackageMetadata.CreateFromManifest('', spec);
+  except
+    on e : Exception do
+    begin
+      result := nil;
+      FLogger.Debug('[PackageCache] Not showing [' + packageId.ToString + '] - its dspec can''t be used : ' + e.Message);
+      //not remembered - the next read is of what the file holds then, not of this until the process ends.
+      key := MakeCacheKey(packageId);
+      FCacheLock.Enter;
+      try
+        FSpecCache.Remove(key);
+      finally
+        FCacheLock.Leave;
+      end;
+    end;
+  end;
 end;
 
 function TPackageCache.ReadInstalledSpec(const packageId : IPackageIdentity) : IPackageSpec;

@@ -33,6 +33,8 @@ type
     procedure WriteText(const path : string; const text : string);
     procedure WriteBuildOutput;
     procedure AssertBuildOutputKept;
+    //installs the test package, then leaves its extracted dspec readable - target platforms and all - but with no id.
+    procedure InstallThenRemoveIdFromDspec(out dspecFile : string; out originalDspec : string);
   public
     [Setup]
     procedure Setup;
@@ -91,6 +93,11 @@ type
     procedure GetPackageMetadata_NeverRepairsTheCache;
     [Test]
     procedure GetPackageMetadata_DoesNotWaitForAnotherProcess;
+    //a dspec that can't be used is a package not to show - never an error for whoever is painting the list.
+    [Test]
+    procedure GetPackageMetadata_ADspecWithoutAnId_IsNotShown;
+    [Test]
+    procedure GetPackageMetadata_ADspecThatCantBeShown_IsReadAgainNextTime;
   end;
 
 implementation
@@ -890,6 +897,66 @@ begin
     holder.WaitFor;
     holder.Free;
   end;
+end;
+
+procedure TPackageCacheVerifyTests.InstallThenRemoveIdFromDspec(out dspecFile : string; out originalDspec : string);
+var
+  cache : IPackageCache;
+  installed : boolean;
+  withoutId : string;
+begin
+  cache := MakeCache('policy-a');
+  installed := cache.InstallPackageFromFile(TCancellationTokenSourceFactory.Create.Token, FPackageFileName);
+  Assert.IsTrue(installed, FLogger.Messages.Text);
+  dspecFile := TPath.Combine(FPackageFolder, cPackageDspecFile);
+  originalDspec := TFile.ReadAllText(dspecFile);
+  withoutId := StringReplace(originalDspec, '  id: Sample.Pkg' + sLineBreak, '', []);
+  Assert.AreNotEqual(originalDspec, withoutId, 'the test dspec has no id line to remove');
+  TFile.WriteAllText(dspecFile, withoutId);
+end;
+
+procedure TPackageCacheVerifyTests.GetPackageMetadata_ADspecWithoutAnId_IsNotShown;
+var
+  cache : IPackageCache;
+  metadata : IPackageMetadata;
+  dspecFile : string;
+  originalDspec : string;
+  logged : string;
+begin
+  InstallThenRemoveIdFromDspec(dspecFile, originalDspec);
+  //a cache that hasn't read the package yet - as the IDE's is when it first lists a project's packages.
+  cache := MakeCache('policy-a');
+  Assert.WillNotRaiseAny(
+    procedure
+    begin
+      metadata := cache.GetPackageMetadata(TestIdentity);
+    end, 'a package whose dspec can''t be used stopped the packages being listed');
+  Assert.IsNull(metadata, 'a package with no id is not something to show');
+  //which file it was is in the log, so it can be found.
+  logged := FLogger.Messages.Text;
+  Assert.IsTrue(Pos(LowerCase(dspecFile), LowerCase(logged)) > 0, 'the log does not name the dspec : ' + logged);
+end;
+
+procedure TPackageCacheVerifyTests.GetPackageMetadata_ADspecThatCantBeShown_IsReadAgainNextTime;
+var
+  cache : IPackageCache;
+  metadata : IPackageMetadata;
+  dspecFile : string;
+  originalDspec : string;
+begin
+  InstallThenRemoveIdFromDspec(dspecFile, originalDspec);
+  cache := MakeCache('policy-a');
+  Assert.WillNotRaiseAny(
+    procedure
+    begin
+      metadata := cache.GetPackageMetadata(TestIdentity);
+    end, 'a package whose dspec can''t be used stopped the packages being listed');
+  Assert.IsNull(metadata, 'the first read should have nothing to show');
+  //the file is as it should be again - and it is the same cache that reads it, as in an IDE that is still running.
+  TFile.WriteAllText(dspecFile, originalDspec);
+  metadata := cache.GetPackageMetadata(TestIdentity);
+  Assert.IsNotNull(metadata, 'what could not be shown was remembered - the package stays hidden until the IDE is restarted');
+  Assert.AreEqual('Sample.Pkg', metadata.Id, false);
 end;
 
 initialization
