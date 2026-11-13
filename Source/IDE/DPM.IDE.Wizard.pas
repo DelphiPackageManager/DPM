@@ -277,6 +277,10 @@ var
   cleanedCount : integer;
   svc : IOTAServices;
   bplPath : string;
+  //The 32-bit IDE uses 'Known Packages'; the 64-bit IDE uses 'Known Packages x64'.
+  //Scrub both so a kill in either IDE does not leave the other bitness broken.
+  subKeys : array[0..1] of string;
+  subKey : string;
 begin
   if cacheRoot = '' then
     exit;
@@ -288,42 +292,47 @@ begin
   baseKey := svc.GetBaseRegistryKey;
   if baseKey = '' then
     exit;
-  knownPackagesKey := baseKey + '\Known Packages';
 
+  subKeys[0] := 'Known Packages';
+  subKeys[1] := 'Known Packages x64';
   cleanedCount := 0;
-  reg := TRegistry.Create(KEY_READ or KEY_WRITE);
-  try
-    reg.RootKey := HKEY_CURRENT_USER;
-    if not reg.OpenKey(knownPackagesKey, false) then
-      exit;
-    valueNames := TStringList.Create;
+  for subKey in subKeys do
+  begin
+    knownPackagesKey := baseKey + '\' + subKey;
+    reg := TRegistry.Create(KEY_READ or KEY_WRITE);
     try
-      reg.GetValueNames(valueNames);
-      //Each value name is the full BPL path; the value's data is the human-readable description.
-      for i := 0 to valueNames.Count - 1 do
-      begin
-        bplPath := valueNames[i];
-        if not StartsText(cacheRootWithDelim, bplPath) then
-          continue;
-        try
-          if reg.DeleteValue(bplPath) then
-          begin
-            FLogger.Information('Removed orphaned Known-Packages entry [' + ExtractFileName(bplPath) + ']');
-            Inc(cleanedCount);
-          end
-          else
-            FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + bplPath + '].');
-        except
-          on e : Exception do
-            FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + bplPath + '] : ' + e.Message);
+      reg.RootKey := HKEY_CURRENT_USER;
+      if not reg.OpenKey(knownPackagesKey, false) then
+        continue;
+      valueNames := TStringList.Create;
+      try
+        reg.GetValueNames(valueNames);
+        //Each value name is the full BPL path; the value's data is the human-readable description.
+        for i := 0 to valueNames.Count - 1 do
+        begin
+          bplPath := valueNames[i];
+          if not StartsText(cacheRootWithDelim, bplPath) then
+            continue;
+          try
+            if reg.DeleteValue(bplPath) then
+            begin
+              FLogger.Information('Removed orphaned Known-Packages entry [' + ExtractFileName(bplPath) + ']');
+              Inc(cleanedCount);
+            end
+            else
+              FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + bplPath + '].');
+          except
+            on e : Exception do
+              FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + bplPath + '] : ' + e.Message);
+          end;
         end;
+      finally
+        valueNames.Free;
       end;
+      reg.CloseKey;
     finally
-      valueNames.Free;
+      reg.Free;
     end;
-    reg.CloseKey;
-  finally
-    reg.Free;
   end;
 
   if cleanedCount > 0 then
@@ -401,8 +410,8 @@ begin
   FThemeChangeNotifierId := -1;
   {$IFEND}
 
-  //If a previous IDE session crashed while DPM design BPLs were loaded, the Known Packages
-  //registry under HKCU\<IDE base>\Known Packages still lists them. The IDE has already
+  //If a previous IDE session crashed while DPM design BPLs were loaded, Known Packages
+  //(and Known Packages x64 for the 64-bit IDE) still lists them. The IDE has already
   //read that key by the time we get here, so we can't stop it loading the stale BPLs THIS
   //session - but scrubbing the registry entries that point into our cache stops the next
   //IDE start from picking them up again.

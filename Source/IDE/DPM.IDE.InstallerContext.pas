@@ -70,6 +70,11 @@ type
     procedure ApplyEnvironmentVariables(const node : IPackageReference; const template : ISpecTemplate; const lcProject : string; const projectEnvVars : IList<TDPMProjectEnvVarRef>);
     procedure ReleaseProjectEnvVars(const lcProject : string);
     function FindLoadedBPL(const bplPath : string; out exactPath : boolean) : boolean;
+    //InstallPackage and UninstallPackage make the IDE save its whole package list to Known Packages,
+    //which writes back every DPM BPL still loaded, not just the one involved. Drop every entry under
+    //the package cache after each of them: a session killed from outside otherwise leaves them for
+    //the next start, which loads Known Packages before this plugin can put the runtime BPL folders on PATH.
+    procedure ForgetPersistedKnownPackages;
   protected
     procedure Clear; override;
     procedure RemoveProject(const projectFile : string); override;
@@ -87,6 +92,8 @@ uses
   System.IOUtils,
   System.StrUtils,
   System.SysUtils,
+  System.Win.Registry,
+  Winapi.Windows,
   Vcl.Forms,
   DPM.Core.Utils.Directory,
   DPM.Core.Utils.Path,
@@ -145,6 +152,72 @@ begin
   FLoadedBPLs := TCollections.CreateDictionary<string, TDPMLoadedBPL>;
   FProjectBPLs := TCollections.CreateDictionary<string, IList<TDPMProjectBPLRef>>;
   FProjectEnvVars := TCollections.CreateDictionary<string, IList<TDPMProjectEnvVarRef>>;
+end;
+
+procedure TDPMIDEPackageInstallerContext.ForgetPersistedKnownPackages;
+var
+  svc : IOTAServices;
+  reg : TRegistry;
+  key : string;
+  cacheRoot : string;
+  names : TStringList;
+  i : integer;
+begin
+  //Failing to drop the registry entries must not fail the load or unload that triggered this,
+  //but it has to be said: the next IDE start will try to load these BPLs before their runtime packages are on PATH.
+  cacheRoot := FPackageCache.PackagesFolder;
+  if cacheRoot = '' then
+  begin
+    FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entries for DPM design BPLs : the package cache location is not set.');
+    exit;
+  end;
+  cacheRoot := IncludeTrailingPathDelimiter(cacheRoot);
+  if not Supports(BorlandIDEServices, IOTAServices, svc) then
+  begin
+    FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entries for DPM design BPLs : the IDE services are not available.');
+    exit;
+  end;
+  key := svc.GetBaseRegistryKey;
+  if key = '' then
+  begin
+    FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entries for DPM design BPLs : the IDE did not report its registry key.');
+    exit;
+  end;
+  //The 64-bit IDE persists design packages under 'Known Packages x64', not 'Known Packages'.
+  if TSystemUtils.Is64BitProcess then
+    key := key + '\Known Packages x64'
+  else
+    key := key + '\Known Packages';
+  reg := TRegistry.Create(KEY_READ or KEY_WRITE);
+  try
+    reg.RootKey := HKEY_CURRENT_USER;
+    if not reg.OpenKey(key, false) then
+    begin
+      FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entries for DPM design BPLs : the key [' + key + '] could not be opened.');
+      exit;
+    end;
+    names := TStringList.Create;
+    try
+      reg.GetValueNames(names);
+      //Each value name is the full BPL path. Anything under the package cache is a DPM design BPL.
+      for i := 0 to names.Count - 1 do
+      begin
+        if not StartsText(cacheRoot, names[i]) then
+          continue;
+        try
+          if not reg.DeleteValue(names[i]) then
+            FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + names[i] + '].');
+        except
+          on e : Exception do
+            FLogger.Warning(TWarningCode.W9106_OrphanCleanupFailed, 'Unable to remove the Known Packages registry entry [' + names[i] + '] : ' + e.Message);
+        end;
+      end;
+    finally
+      names.Free;
+    end;
+  finally
+    reg.Free;
+  end;
 end;
 
 function TDPMIDEPackageInstallerContext.ResolveDesignBPLPath(const node : IPackageReference; const designEntry : ISpecDesignEntry; const loadPlatform : TDPMPlatform; out bplPath : string; out bplFolder : string) : boolean;
@@ -396,6 +469,9 @@ begin
       loaded.Referencers := TCollections.CreateList<string>;
       loaded.Referencers.Add(lcProject);
       FLoadedBPLs[lcBpl] := loaded;
+      //Loaded from a Known Packages entry a previous session left behind. Drop the entry so the
+      //next start does not try to load it again before its runtime BPL is on PATH.
+      ForgetPersistedKnownPackages;
       FLogger.Information('Design BPL [' + ExtractFileName(bplPath) + '] already loaded by the IDE - taking ownership for tracking.');
       exit;
     end;
@@ -432,6 +508,7 @@ begin
     FLogger.Warning(TWarningCode.W9101_DesignPackageLoadFailed, 'The IDE did not load the design BPL [' + bplPath + ']' + loadError);
     FPathManager.RemovePath(bplFolder);
     RemovePaths(dependencyFolders);
+    ForgetPersistedKnownPackages;
     result := false;
     exit;
   end;
@@ -443,6 +520,7 @@ begin
   loaded.Referencers := TCollections.CreateList<string>;
   loaded.Referencers.Add(lcProject);
   FLoadedBPLs[lcBpl] := loaded;
+  ForgetPersistedKnownPackages;
   FLogger.Success('Loaded design BPL [' + ExtractFileName(bplPath) + ']');
 end;
 
@@ -491,6 +569,7 @@ begin
 
   if not uninstallOk then
     FLogger.Warning(TWarningCode.W3014_DesignPackageUnloadFailed, 'The IDE did not unload the design BPL [' + ExtractFileName(loaded.BPLPath) + '] - DPM has stopped tracking it' + unloadError);
+  ForgetPersistedKnownPackages;
 
   FPathManager.RemovePath(loaded.BPLFolder);
   RemovePaths(loaded.DependencyFolders);
