@@ -62,6 +62,10 @@ type
     FGroupProjects : IList<string>;
     FProjectController : IDPMIDEProjectController;
     FProjectNotifiers : IDictionary<string, IOTAProjectNotifier>;
+    //Lowercase dproj paths whose restore is waiting for ofnFileOpened. Set when another project
+    //is already open: the IDE asks about unsaved changes after ofnFileOpening returns, and
+    //restoring before that question leaves the new project half opened.
+    FPendingRestore : ISet<string>;
     //Parallel to FProjectNotifiers - records the index returned by project.AddNotifier so we can
     //call project.RemoveNotifier(index) on the IDE side. Without this, the project notifier stays
     //attached to IOTAProject past project close and the circular ref via FIDENotifier keeps us
@@ -97,6 +101,9 @@ type
 
     procedure AddProjectNotifier(const fileName : string);
     procedure RemoveProjectNotifier(const fileName : string);
+    function AnotherProjectIsOpen(const fileName : string) : boolean;
+    //fileIsOpen is false for ofnFileOpening and true for ofnFileOpened.
+    procedure RestoreProject(const fileName : string; const fileIsOpen : boolean);
 
 
     //IDPMIDENotifier;
@@ -194,7 +201,51 @@ begin
   FGroupProjects := TCollections.CreateList<string> ;
   FProjectNotifiers := TCollections.CreateDictionary<string, IOTAProjectNotifier>;
   FProjectNotifierIndexes := TCollections.CreateDictionary<string, integer>;
+  FPendingRestore := TCollections.CreateSet<string>;
   FProjectController := projectController;
+end;
+
+function TDPMIDENotifier.AnotherProjectIsOpen(const fileName : string) : boolean;
+var
+  services : IOTAModuleServices;
+  project : IOTAProject;
+begin
+  result := false;
+  if not Supports(BorlandIDEServices, IOTAModuleServices, services) then
+    exit;
+  //ofnFileOpening is delivered before the new project becomes the active one, so this is the
+  //project the IDE is about to ask the user to save.
+  project := services.GetActiveProject;
+  result := (project <> nil) and (not SameText(project.FileName, fileName));
+end;
+
+procedure TDPMIDENotifier.RestoreProject(const fileName : string; const fileIsOpen : boolean);
+var
+  key : string;
+begin
+  if not FileExists(fileName) then
+    exit;
+  key := LowerCase(fileName);
+  if not fileIsOpen then
+  begin
+    //Nothing else is open: restore before the IDE reads the dproj, so a rewrite is the file it
+    //loads. Another project is open: the save-changes question comes after this notification
+    //returns. Restoring here shows the log and loads design packages first, and answering Yes
+    //then leaves the new project unfinished. Wait until ofnFileOpened, which is only sent once
+    //that question has been answered and the open has gone ahead.
+    if AnotherProjectIsOpen(fileName) then
+      FPendingRestore.Add(key)
+    else
+    begin
+      FPendingRestore.Remove(key);
+      FProjectController.ProjectOpening(fileName);
+    end;
+  end
+  else if FPendingRestore.Contains(key) then
+  begin
+    FPendingRestore.Remove(key);
+    FProjectController.ProjectOpening(fileName);
+  end;
 end;
 
 destructor TDPMIDENotifier.Destroy;
@@ -380,8 +431,7 @@ begin
           FProjectController.BeginLoading(TProjectMode.pmSingle);
         {$IFEND}
 
-        if FileExists(FileName) then
-          FProjectController.ProjectOpening(FileName);
+        RestoreProject(FileName, false);
 
       end;
     ofnFileOpened :
@@ -390,6 +440,8 @@ begin
           exit;
         FLogger.Debug('TDPMIDENotifier ofnFileOpened ' + FileName);
         TSystemUtils.OutputDebugString('TDPMIDENotifier ofnFileOpened : ' + FileName);
+        //Before EndLoading, so a deferred restore's log is closed with the load it belongs to.
+        RestoreProject(FileName, true);
         {$IF CompilerVersion < 34.0}
         if FLoadingGroup then
         begin
