@@ -45,7 +45,16 @@ type
     Value : string;     //value with $packageDir$ already resolved
   end;
 
-  TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext)
+  //The IDE context, seen by the project controller. Kept off IPackageInstallerContext so the CLI
+  //implementation does not grow an IDE-only method.
+  IDPMIDEInstallerContext = interface
+    ['{7C3E9A14-6B52-4F0E-9C31-2A8D5F14E6B0}']
+    //Names a project whose open has started. It stays protected until its own close.
+    //Delphi closes the previous group while this open is still in progress.
+    procedure BeginProjectOpen(const projectFile : string);
+  end;
+
+  TDPMIDEPackageInstallerContext = class(TCorePackageInstallerContext, IPackageInstallerContext, IDPMIDEInstallerContext)
   private
     FPathManager : IDPMIDEPathManager;
     FEnvVarManager : IDPMIDEEnvironmentVariableManager;
@@ -56,6 +65,9 @@ type
     FProjectBPLs : IDictionary<string, IList<TDPMProjectBPLRef>>;
     //key: lowercase project file. Env vars applied for this project, in apply order.
     FProjectEnvVars : IDictionary<string, IList<TDPMProjectEnvVarRef>>;
+    //Lowercase project files whose open has started and which have not been closed.
+    //Clear keeps these loaded. RemoveProject is what unloads one, when that project itself closes.
+    FOpenedThisLoad : ISet<string>;
     function ResolveDesignBPLPath(const node : IPackageReference; const designEntry : ISpecDesignEntry; const loadPlatform : TDPMPlatform; out bplPath : string; out bplFolder : string) : boolean;
     //The bpl folders (for loadPlatform) of every package node depends on, directly or not, that has one. A design
     //bpl's runtime packages - its own and its dependencies' - are found the way Windows finds any dll a module
@@ -78,6 +90,7 @@ type
   protected
     procedure Clear; override;
     procedure RemoveProject(const projectFile : string); override;
+    procedure BeginProjectOpen(const projectFile : string);
     function InstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const packageSpecs : IDictionary<string, IPackageSpec>) : boolean; override;
     function UninstallDesignPackages(const cancellationToken : ICancellationToken; const projectFile : string; const orphanedPackageIds : IList<string>) : boolean; override;
   public
@@ -152,6 +165,14 @@ begin
   FLoadedBPLs := TCollections.CreateDictionary<string, TDPMLoadedBPL>;
   FProjectBPLs := TCollections.CreateDictionary<string, IList<TDPMProjectBPLRef>>;
   FProjectEnvVars := TCollections.CreateDictionary<string, IList<TDPMProjectEnvVarRef>>;
+  FOpenedThisLoad := TCollections.CreateSet<string>;
+end;
+
+procedure TDPMIDEPackageInstallerContext.BeginProjectOpen(const projectFile : string);
+begin
+  //Kept until RemoveProject. The previous group's close can arrive after this open's restore
+  //returns, and that close must not unload the design packages just loaded.
+  FOpenedThisLoad.Add(LowerCase(projectFile));
 end;
 
 procedure TDPMIDEPackageInstallerContext.ForgetPersistedKnownPackages;
@@ -821,6 +842,7 @@ var
   lcProject : string;
 begin
   lcProject := LowerCase(projectFile);
+  FOpenedThisLoad.Remove(lcProject);
   ReleaseProjectBPLs(lcProject);
   FProjectBPLs.Remove(lcProject);
   ReleaseProjectEnvVars(lcProject);
@@ -830,6 +852,7 @@ end;
 
 procedure TDPMIDEPackageInstallerContext.Clear;
 var
+  tracked : ISet<string>;
   keys : TArray<string>;
   key : string;
 begin
@@ -842,21 +865,35 @@ begin
     FProjectBPLs.Clear;
     FLoadedBPLs.Clear;
     FProjectEnvVars.Clear;
+    FOpenedThisLoad.Clear;
     exit;
   end;
-  //snapshot keys so we can release without invalidating enumeration
-  keys := FProjectBPLs.Keys.ToArray;
-  for key in keys do
-    ReleaseProjectBPLs(key);
-  FProjectBPLs.Clear;
-  FLoadedBPLs.Clear; //defensive - should be empty by now
 
-  //restore any env vars we set, then drop tracking.
-  keys := FProjectEnvVars.Keys.ToArray;
+  //Every project we still have a record for. Graphs live on the ancestor; a project can have a
+  //graph and no design BPL, and that record has to go too when the project is actually closing.
+  tracked := TCollections.CreateSet<string>;
+  for key in FProjectBPLs.Keys do
+    tracked.Add(key);
+  for key in FProjectEnvVars.Keys do
+    tracked.Add(key);
+  for key in FProjectGraphs.Keys do
+    tracked.Add(key);
+  for key in FProjectResolutions.Keys do
+    tracked.Add(key);
+  for key in FUseSourceState.Keys do
+    tracked.Add(key);
+  keys := tracked.ToArray;
+
+  //Opening the next project while one is open closes the previous group as part of that open.
+  //The new project's design packages are already loaded by then. Releasing every tracked project
+  //here unloaded them again, so the palette never showed them and the IDE could not find the
+  //design BPL. Projects named by BeginProjectOpen stay loaded until their own close calls
+  //RemoveProject. Every other tracked project is the one going away.
+  if FOpenedThisLoad.Count > 0 then
+    FLogger.Debug('Project group closed while a project is opening - keeping the design packages loaded for that project.');
   for key in keys do
-    ReleaseProjectEnvVars(key);
-  FProjectEnvVars.Clear;
-  inherited;
+    if not FOpenedThisLoad.Contains(key) then
+      RemoveProject(key);
 end;
 
 end.
