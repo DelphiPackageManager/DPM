@@ -183,9 +183,10 @@ type
   ///</summary>
   IPackageInstallerContext = interface
     ['{8FD229A2-FE7B-4315-84B2-FF18B78C76DC}']
-    /// <summary> Wipes all recorded per-project graphs and resolutions. Called by the IDE
-    /// project controller in ProjectGroupClosed - the right trigger, since the next group's projects
-    /// will record their own state from scratch. </summary>
+    /// <summary> Drops recorded per-project graphs and resolutions for projects that are closing.
+    /// Called by the IDE project controller in ProjectGroupClosed. The IDE implementation keeps a
+    /// project that has already started opening: Delphi closes the previous group while that open
+    /// is still in progress, and wiping it unloads the design packages just loaded for it. </summary>
     procedure Clear;
 
     ///<summary>called from the ProjectController when a project is closed.</summary>

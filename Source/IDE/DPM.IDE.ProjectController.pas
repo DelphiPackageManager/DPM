@@ -104,7 +104,8 @@ uses
   DPM.Core.Utils.System,
   DPM.IDE.Types,
   DPM.Core.Diagnostics,
-  DPM.Core.Logging;
+  DPM.Core.Logging,
+  DPM.IDE.InstallerContext;
 
 { TDPMIDEProjectController }
 
@@ -242,8 +243,15 @@ end;
 
 
 procedure TDPMIDEProjectController.ProjectOpening(const fileName: string);
+var
+  ideContext : IDPMIDEInstallerContext;
 begin
   FLogger.Debug('ProjectController.ProjectOpening : ' + fileName);
+  //Name the project before restore loads its design packages. The previous group's close can
+  //arrive before this open returns, and that close must not unload what restore just loaded.
+  //The name stays until the project itself closes.
+  if Supports(FInstallerContext, IDPMIDEInstallerContext, ideContext) then
+    ideContext.BeginProjectOpen(fileName);
   RestoreProject(fileName);
 end;
 
