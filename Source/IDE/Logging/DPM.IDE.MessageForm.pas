@@ -18,6 +18,10 @@ uses
 
 {$I ..\DPMIDE.inc}
 
+const
+  //Posted by the log window to itself when it is hidden - see TDPMMessageForm.WMDestroyHiddenWindow.
+  WM_DPM_DESTROYHIDDENWINDOW = WM_APP + $0D01;
+
 type
   TDPMMessageForm = class(TForm {$IFDEF THEMESERVICES}, INTAIDEThemingServicesNotifier {$ENDIF})
     btnCancel: TButton;
@@ -83,6 +87,7 @@ type
     procedure CMShowingChanged(var Message: TMessage); message CM_SHOWINGCHANGED;
     procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
     procedure WMWindowPosChanging(var Message: TWMWindowPosChanging); message WM_WINDOWPOSCHANGING;
+    procedure WMDestroyHiddenWindow(var Message: TMessage); message WM_DPM_DESTROYHIDDENWINDOW;
 
     //INTAIDEThemingServicesNotifier
     procedure ChangingTheme;
@@ -298,10 +303,34 @@ begin
   inherited;
 end;
 
+//Closing the log window only ever hid it - the form lives for the whole IDE session. Its WINDOW must not : once we
+//are hidden the window is destroyed, and the VCL makes a new one on the next Show (as it does the first time we are
+//shown - there is no window until then, so everything here already copes with not having one).
+//Left behind, the window was hidden but still ENABLED - a modal dialog only disables the windows that are visible -
+//and, having been active once, it stayed the application window's last active popup for the rest of the session
+//(we are owned by the application window, see CreateParams). When the IDE is switched away from and back to while
+//a modal dialog is up, TApplication sets the focus to exactly that window (Vcl.Forms, CM_ACTIVATE :
+//SetFocus(FLastActivePopup), which it took from GetLastActivePopup when the IDE was deactivated) without asking
+//whether it is visible - and Windows will focus a hidden window. The keyboard focus went to a window nobody could
+//see. For the IDE's Compiling dialog it was worse : getting the focus back from us is the dialog being activated
+//again, and once the build has finished that makes the IDE start it a second time with nothing to build - an
+//access violation in coreide (TBuildHost.BeforeBuild), shown as a fatal error after a successful build.
+//Destroying the window is also what makes Windows forget it as the last active popup.
+//Posted from CMShowingChanged rather than done there : we can be hidden from inside the message handling of our
+//own controls (the Close button, the close box), and under the IDE's theming a control's style hook is freed with
+//its window - while that hook is still handling the message. It is why TCustomForm.Release posts as well.
+procedure TDPMMessageForm.WMDestroyHiddenWindow(var Message: TMessage);
+begin
+  //shown again before this arrived - the window is wanted.
+  if Visible then
+    exit;
+  DestroyHandle;
+end;
+
 procedure TDPMMessageForm.StartCloseCountdown;
 begin
   FCloseTimerRunning := true;
-  //No handle yet means we were never shown - CreateWnd arms it if that changes.
+  //No handle means we are not on screen (never shown, or hidden since) - CreateWnd arms it if that changes.
   if not HandleAllocated then
     exit;
   SetTimer(Handle, CCloseTimerId, 1000, nil);
@@ -388,7 +417,10 @@ begin
   begin
     FShownStopwatch := TStopwatch.StartNew;
     PaintNow;
-  end;
+  end
+  else if HandleAllocated then
+    //Hidden means gone - the window is not left behind. Posted, not done here - see WMDestroyHiddenWindow.
+    PostMessage(Handle, WM_DPM_DESTROYHIDDENWINDOW, 0, 0);
 end;
 
 procedure TDPMMessageForm.PaintNow;
